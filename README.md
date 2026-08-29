@@ -1,5 +1,7 @@
 # 📺 Bili Content Extractor（B站视频内容一键提取）
 
+**[English](README_EN.md) · 中文**
+
 把任意 B 站视频变成**可读文本 + 可投喂的总结材料**，全程本地、免费、不消耗 token。
 
 ![工作流程](docs/flow.svg)
