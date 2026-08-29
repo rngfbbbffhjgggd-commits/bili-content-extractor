@@ -1,0 +1,32 @@
+# 敏感信息 - 切勿提交
+cookie.txt
+deepseek_key.txt
+
+# 用户生成内容
+BilibiliContent/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# 模型（体积大，单独下载）
+models/
+*.gguf
+*.onnx
+*.tar.gz
+*.part
+
+# IDE / 系统
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# 测试产物
+test/
+*.wav
+*.m4s
+*.mp3
