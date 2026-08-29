@@ -1,0 +1,39 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="860" height="220" viewBox="0 0 860 220">
+  <rect width="860" height="220" rx="16" fill="#1e1e2e"/>
+  <text x="30" y="45" font-family="Microsoft YaHei, sans-serif" font-size="20" font-weight="bold" fill="#cdd6f4">Bili Content Extractor</text>
+  <text x="30" y="70" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#a6adc8">B站视频内容一键提取 · AI字幕优先 · 本地转写 · 免费总结</text>
+
+  <rect x="30" y="100" width="150" height="80" rx="10" fill="#89b4fa" opacity="0.15" stroke="#89b4fa" stroke-width="1.5"/>
+  <text x="105" y="132" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="14" fill="#89b4fa">B站视频链接</text>
+  <text x="105" y="155" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#a6adc8">BV号 / URL</text>
+
+  <path d="M180 140 H215" stroke="#f9e2af" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="220" y="100" width="170" height="80" rx="10" fill="#a6e3a1" opacity="0.15" stroke="#a6e3a1" stroke-width="1.5"/>
+  <text x="305" y="128" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#a6e3a1">有 AI 字幕</text>
+  <text x="305" y="148" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#cdd6f4">直接下载字幕</text>
+  <text x="305" y="166" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#a6adc8">txt / srt</text>
+
+  <path d="M305 180 V195 H430" stroke="#f9e2af" stroke-width="2" fill="none" marker-end="url(#arrow)"/>
+  <text x="370" y="210" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="10" fill="#a6adc8">无字幕 → 本地转写</text>
+
+  <rect x="440" y="150" width="180" height="50" rx="10" fill="#f9e2af" opacity="0.15" stroke="#f9e2af" stroke-width="1.5"/>
+  <text x="530" y="172" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#f9e2af">中文 → Qwen3-ASR（22方言）</text>
+  <text x="530" y="190" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#f9e2af">英文 → Parakeet（词级时间戳）</text>
+
+  <rect x="440" y="95" width="180" height="45" rx="10" fill="#cba6f7" opacity="0.15" stroke="#cba6f7" stroke-width="1.5"/>
+  <text x="530" y="122" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="12" fill="#cba6f7">投喂文件.md（指令 + 时间戳全文）</text>
+
+  <path d="M620 120 H655" stroke="#f9e2af" stroke-width="2" marker-end="url(#arrow)"/>
+
+  <rect x="660" y="100" width="170" height="80" rx="10" fill="#f38ba8" opacity="0.15" stroke="#f38ba8" stroke-width="1.5"/>
+  <text x="745" y="132" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="13" fill="#f38ba8">DeepSeek 网页版</text>
+  <text x="745" y="155" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#cdd6f4">免费 · 不耗 token</text>
+  <text x="745" y="173" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="11" fill="#a6adc8">详细时间线总结</text>
+
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+      <path d="M0,0 L6,3 L0,6 Z" fill="#f9e2af"/>
+    </marker>
+  </defs>
+</svg>
