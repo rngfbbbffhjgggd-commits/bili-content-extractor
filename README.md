@@ -12,7 +12,7 @@ B站 / YouTube 视频链接
    ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
    └─ 无字幕 ──→ 自动检测语言，本地转写
-                  ├─ 中文 → SenseVoice（RTF<0.1 快8倍）或 Qwen3-ASR（更准）
+                  ├─ 中文 → 自动选引擎（<10分钟 Qwen3-ASR 更准 / ≥10分钟 SenseVoice 快8倍）
                   └─ 英文 → Parakeet-TDT-0.6B（词级时间戳，RTF 0.16）
                         │
                         ▼
@@ -26,7 +26,7 @@ B站 / YouTube 视频链接
 
 - **多平台**：支持 **B站**（AI 字幕优先）和 **YouTube**（Transcript API 免费字幕，无字幕自动转写）
 - **字幕优先**：有字幕的视频直接下载，零成本零延迟
-- **中文极速转写**：SenseVoice（RTF<0.1，**比实时快 10 倍**，10 分钟视频约 50 秒转完）；可选 Qwen3-ASR（22 种方言，高准确率）
+- **中文引擎自动选择**：短视频用 Qwen3-ASR（22 方言，更准），长视频用 SenseVoice（RTF<0.1 快 8 倍），无需手动切换
 - **英文词级时间戳**：Parakeet 每个词带时间戳+置信度，噪声鲁棒性超 Whisper
 - **免费总结**：产出带指令的投喂文件，配合 DeepSeek **网页版**免费总结，不消耗 API token
 - **全程本地**：音频转写完全本地运行，不上传
@@ -62,7 +62,7 @@ D:\BiliModels\sensevoice\
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
-> 用 `--engine=qwen` 切换（22 种方言，更准但慢 8 倍）。
+> 短（<10 分钟）视频自动用它；也可 `--engine=qwen` 强制（22 种方言，更准但慢 8 倍）。
 
 ### 英文：Parakeet-TDT-0.6B（675MB）
 
@@ -103,7 +103,7 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # B站
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <链接> --lang=zh                                 # 强制中文
 python bili_quick.py <链接> --lang=en                                 # 强制英文
-python bili_quick.py <链接> --engine=qwen                            # 中文用 Qwen3-ASR（更准，慢8倍）
+python bili_quick.py <链接> --engine=auto|sensevoice|qwen            # 可选：强制中文引擎（默认auto: 短准长快）
 python bili_quick.py <链接> --api                                     # 可选：用 DeepSeek API 自动总结（消耗 token）
 ```
 
