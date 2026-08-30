@@ -12,8 +12,8 @@ Bilibili / YouTube video URL
    ├─ Has subtitles ──→ Download subtitles directly (Bilibili AI subs / YouTube Transcript API)
    │
    └─ No subtitles ──→ Auto language detection + local transcription
-                       ├─ Chinese/dialects → Qwen3-ASR-1.7B (22 dialects, fast & accurate)
-                       └─ English         → Parakeet-TDT-0.6B (word-level timestamps, RTF 0.16)
+                       ├─ Chinese → SenseVoice (RTF<0.1, 10× faster) or Qwen3-ASR (more accurate)
+                       └─ English → Parakeet-TDT-0.6B (word-level timestamps, RTF 0.16)
                              │
                              ▼
                 Generates a "prompt file.md" (instructions + timestamped transcript)
@@ -26,11 +26,11 @@ Bilibili / YouTube video URL
 
 - **Multi-platform**: **Bilibili** (AI subtitles first) + **YouTube** (free Transcript API subtitles, auto-transcribe when missing)
 - **Subtitles first**: videos with subtitles are downloaded directly — zero cost, zero delay
-- **Chinese dialect support**: Qwen3-ASR handles 22 Chinese dialects; significantly better than Whisper on casual speech, fast talkers, and unclear articulation
+- **Ultra-fast Chinese**: SenseVoice (RTF<0.1, **10× faster than real-time**, a 10-min video ≈ 50s); optional Qwen3-ASR (22 Chinese dialects, higher accuracy)
 - **English word-level timestamps**: Parakeet outputs per-word timestamps + confidence; more noise-robust than Whisper
 - **Free summaries**: generates a self-contained prompt file for **DeepSeek web** — get a detailed timeline summary for free, no API token consumed
 - **100% local**: transcription runs entirely on your machine, nothing uploaded
-- **Disk friendly**: both models ≈ 4.5GB, on any drive (default `D:\BiliModels`, configurable via env vars)
+- **Disk friendly**: models ≈ 5GB, on any drive (default `D:\BiliModels`, configurable via env vars)
 
 ## 📦 Requirements
 
@@ -46,14 +46,23 @@ cd bili-content-extractor
 pip install -r requirements.txt
 ```
 
-## 🤖 Download Models (~4.5GB, into `D:\BiliModels` or your own directory)
+## 🤖 Download Models (~5GB, into `D:\BiliModels` or your own directory)
 
-### Chinese: Qwen3-ASR-1.7B (int4 ONNX, 3.9GB)
+### Chinese (default, ultra-fast): SenseVoice (int8 ONNX, 239MB)
+
+Download `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2` from [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models), extract to:
+```
+D:\BiliModels\sensevoice\
+```
+> ⚡ SenseVoice: RTF<0.1 — a 10-min Chinese video transcribes in ~50s.
+
+### Chinese (optional, higher accuracy): Qwen3-ASR-1.7B (int4 ONNX, 3.9GB)
 
 Download `qwen3-asr-1.7b-int4.tar.gz` from [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) and extract to:
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
+> Use `--engine=qwen` to switch (22 Chinese dialects, more accurate but ~8× slower).
 
 ### English: Parakeet-TDT-0.6B (675MB)
 
@@ -94,6 +103,7 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # Bilibili
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <url> --lang=zh                                 # force Chinese
 python bili_quick.py <url> --lang=en                                 # force English
+python bili_quick.py <url> --engine=qwen                            # Chinese via Qwen3-ASR (more accurate, 8× slower)
 python bili_quick.py <url> --api                                     # optional: auto-summarize via DeepSeek API (costs tokens)
 ```
 
@@ -108,6 +118,7 @@ python bili_quick.py <url> --api                                     # optional:
 |---|---|---|
 | `BILI_MODELS_ROOT` | `D:\BiliModels` | models root directory |
 | `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR model dir |
+| `SENSEVOICE_DIR` | `<MODELS_ROOT>\sensevoice\...` | SenseVoice model dir |
 | `PARAKET_EXE` | `<MODELS_ROOT>\parakeet\...\parakeet-cli.exe` | parakeet executable |
 | `PARAKET_GGUF` | `<MODELS_ROOT>\parakeet\tdt-0.6b-v3-q4_k.gguf` | parakeet model |
 | `BILI_COOKIE_FILE` | `./cookie.txt` | cookie file path (Bilibili only) |

@@ -12,8 +12,8 @@ B站 / YouTube 视频链接
    ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
    └─ 无字幕 ──→ 自动检测语言，本地转写
-                  ├─ 中文/方言 → Qwen3-ASR-1.7B（22种方言，快且准）
-                  └─ 英文      → Parakeet-TDT-0.6B（词级时间戳，RTF 0.16）
+                  ├─ 中文 → SenseVoice（RTF<0.1 快8倍）或 Qwen3-ASR（更准）
+                  └─ 英文 → Parakeet-TDT-0.6B（词级时间戳，RTF 0.16）
                         │
                         ▼
           生成「投喂文件.md」（视频信息 + 指令 + 带时间戳全文）
@@ -26,11 +26,11 @@ B站 / YouTube 视频链接
 
 - **多平台**：支持 **B站**（AI 字幕优先）和 **YouTube**（Transcript API 免费字幕，无字幕自动转写）
 - **字幕优先**：有字幕的视频直接下载，零成本零延迟
-- **中文方言识别**：Qwen3-ASR 支持 22 种中文方言，口语/快语速/吐字不清场景显著优于 Whisper
+- **中文极速转写**：SenseVoice（RTF<0.1，**比实时快 10 倍**，10 分钟视频约 50 秒转完）；可选 Qwen3-ASR（22 种方言，高准确率）
 - **英文词级时间戳**：Parakeet 每个词带时间戳+置信度，噪声鲁棒性超 Whisper
 - **免费总结**：产出带指令的投喂文件，配合 DeepSeek **网页版**免费总结，不消耗 API token
 - **全程本地**：音频转写完全本地运行，不上传
-- **硬盘友好**：双模型约 4.5GB，可放任意盘（默认 `D:\BiliModels`，环境变量可改）
+- **硬盘友好**：模型约 5GB，可放任意盘（默认 `D:\BiliModels`，环境变量可改）
 
 ## 📦 环境要求
 
@@ -46,14 +46,23 @@ cd bili-content-extractor
 pip install -r requirements.txt
 ```
 
-## 🤖 模型下载（约 4.5GB，放 `D:\BiliModels` 或自定义目录）
+## 🤖 模型下载（约 5GB，放 `D:\BiliModels` 或自定义目录）
 
-### 中文：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
+### 中文（默认，极速）：SenseVoice（int8 ONNX，239MB）
+
+从 [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) 下载 `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2`，解压到：
+```
+D:\BiliModels\sensevoice\
+```
+> ⚡ SenseVoice：RTF<0.1，10 分钟中文视频约 50 秒转完。
+
+### 中文（可选，高准确率）：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
 
 从 [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) 下载 `qwen3-asr-1.7b-int4.tar.gz`，解压到：
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
+> 用 `--engine=qwen` 切换（22 种方言，更准但慢 8 倍）。
 
 ### 英文：Parakeet-TDT-0.6B（675MB）
 
@@ -94,6 +103,7 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # B站
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <链接> --lang=zh                                 # 强制中文
 python bili_quick.py <链接> --lang=en                                 # 强制英文
+python bili_quick.py <链接> --engine=qwen                            # 中文用 Qwen3-ASR（更准，慢8倍）
 python bili_quick.py <链接> --api                                     # 可选：用 DeepSeek API 自动总结（消耗 token）
 ```
 
@@ -108,6 +118,7 @@ python bili_quick.py <链接> --api                                     # 可选
 |---|---|---|
 | `BILI_MODELS_ROOT` | `D:\BiliModels` | 模型根目录 |
 | `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR 模型目录 |
+| `SENSEVOICE_DIR` | `<MODELS_ROOT>\sensevoice\...` | SenseVoice 模型目录 |
 | `PARAKET_EXE` | `<MODELS_ROOT>\parakeet\...\parakeet-cli.exe` | parakeet 可执行文件 |
 | `PARAKET_GGUF` | `<MODELS_ROOT>\parakeet\tdt-0.6b-v3-q4_k.gguf` | parakeet 模型 |
 | `BILI_COOKIE_FILE` | `./cookie.txt` | cookie 文件路径（仅 B站） |
