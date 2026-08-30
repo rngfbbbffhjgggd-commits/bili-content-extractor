@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""bili_quick.py — 视频内容一键提取（B站 / YouTube，中文 SenseVoice/Qwen3-ASR / 英文 Parakeet）
+"""bili_quick.py — B站/YouTube 视频内容一键提取（中文 SenseVoice/Qwen3-ASR 自动选择 / 英文 Parakeet）
 
 用法:
   交互模式:   python bili_quick.py           (双击 bat 即可)
   直接模式:   python bili_quick.py <链接或BV号>
   指定语言:   python bili_quick.py <链接> --lang zh|en|auto (默认 auto)
-  指定引擎:   python bili_quick.py <链接> --engine sensevoice|qwen (中文默认 sensevoice)
+  指定引擎:   python bili_quick.py <链接> --engine auto|sensevoice|qwen (中文默认 auto: 短准长快)
 
 流程:
   有字幕: 抓字幕 -> txt/srt (B站AI字幕 / YouTube Transcript API)
-  无字幕: 下载音频 -> 自动识别语言 -> 中文SenseVoice(快8倍)/Qwen3-ASR / 英文Parakeet 转写
+  无字幕: 下载音频 -> 自动识别语言 -> 中文(自动选引擎)/Parakeet(英文) 转写
   产物:    投喂文件.md (视频信息 + 指令 + 带时间戳全文) -> 拖进 DeepSeek 网页版即可总结
 输出目录: tools/BilibiliContent/<BV号或yt-视频ID>/
 模型目录: D:\\BiliModels\\ (SenseVoice + Qwen3-ASR + Parakeet)
@@ -158,10 +158,14 @@ def download_audio(bv, cid, outpath):
     return outpath
 
 
-# ---------- 中文转写：SenseVoice（默认，快8倍）/ Qwen3-ASR（可选，更准） ----------
+# ---------- 中文转写：SenseVoice（快）/ Qwen3-ASR（准），自动按时长选择 ----------
 
-def zh_transcribe(audio_path, outdir, engine="sensevoice"):
-    """中文转写：默认 SenseVoice（RTF<0.1，快 8 倍），--engine=qwen 切 Qwen3-ASR"""
+def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
+    """中文转写：auto 模式按时长选择（短→Qwen3-ASR准，长→SenseVoice快），可强制指定"""
+    if engine == "auto":
+        # 10 分钟以下用 Qwen3-ASR（准确率优先），以上用 SenseVoice（速度优先）
+        engine = "qwen" if duration < 600 else "sensevoice"
+        print(f"[√] 自动选择引擎: {'Qwen3-ASR (短视频,更准)' if engine == 'qwen' else 'SenseVoice (长视频,快8倍)'}")
     if engine == "sensevoice":
         try:
             from sensevoice_engine import transcribe_audio as sv_transcribe
@@ -334,7 +338,7 @@ def download_youtube_audio(video_id, outdir):
     return hits[0] if hits else None
 
 
-def run_youtube(url, use_api=False, lang_manual=None, engine="sensevoice"):
+def run_youtube(url, use_api=False, lang_manual=None, engine="auto"):
     video_id = parse_youtube_id(url)
     if not video_id:
         print("[x] 无法解析 YouTube 链接")
@@ -363,8 +367,13 @@ def run_youtube(url, use_api=False, lang_manual=None, engine="sensevoice"):
         lang = detect_lang(title, "", lang_manual)
         print(f"[√] 检测语言: {'中文' if lang == 'zh' else '英文'}")
         if lang == "zh":
-            segs = zh_transcribe(wav, outdir, engine)
-            engine_note = "SenseVoice (中文, 快8倍)" if engine == "sensevoice" else "Qwen3-ASR-1.7B (中文/方言)"
+            import wave as _wave
+
+            with _wave.open(wav) as _wf:
+                dur = _wf.getnframes() / _wf.getframerate()
+            segs = zh_transcribe(wav, outdir, engine, dur)
+            engine_note = ("SenseVoice (中文, 快8倍)" if engine == "sensevoice"
+                           else "Qwen3-ASR-1.7B (中文/方言)" if engine == "qwen" else "中文引擎(自动)")
         else:
             segs = parakeet_transcribe(wav)
             engine_note = "Parakeet-TDT-0.6B (英文)"
@@ -394,7 +403,7 @@ def run_youtube(url, use_api=False, lang_manual=None, engine="sensevoice"):
 
 # ---------- 平台分发 ----------
 
-def run_any(url, use_api=False, lang_manual=None, engine="sensevoice"):
+def run_any(url, use_api=False, lang_manual=None, engine="auto"):
     if "bilibili.com" in url or "b23.tv" in url or re.search(r"BV[0-9A-Za-z]{10}", url):
         run(url, use_api, lang_manual, engine)
     elif "youtube.com" in url or "youtu.be" in url:
@@ -405,7 +414,7 @@ def run_any(url, use_api=False, lang_manual=None, engine="sensevoice"):
 
 # ---------- B站主流程 ----------
 
-def run(url, use_api=False, lang_manual=None, engine="sensevoice"):
+def run(url, use_api=False, lang_manual=None, engine="auto"):
     bv = bt.parse_bv(url)
     if not os.path.exists(COOKIE_FILE):
         print(f"[x] 缺少 cookie 文件 {COOKIE_FILE}")
@@ -463,8 +472,9 @@ def run(url, use_api=False, lang_manual=None, engine="sensevoice"):
         lang = detect_lang(title, data.get("desc", ""), lang_manual)
         print(f"[√] 检测语言: {'中文' if lang == 'zh' else '英文'}")
         if lang == "zh":
-            segments = zh_transcribe(wav, outdir, engine)
-            engine_note = "SenseVoice (中文, 快8倍)" if engine == "sensevoice" else "Qwen3-ASR-1.7B (中文/方言)"
+            segments = zh_transcribe(wav, outdir, engine, data["duration"])
+            engine_note = ("SenseVoice (中文, 快8倍)" if engine == "sensevoice"
+                           else "Qwen3-ASR-1.7B (中文/方言)" if engine == "qwen" else "中文引擎(自动)")
         else:
             segments = parakeet_transcribe(wav)
             engine_note = "Parakeet-TDT-0.6B (英文)"
@@ -501,7 +511,7 @@ def main():
     for a in args:
         if a.startswith("--lang="):
             lang_manual = a.split("=", 1)[1]
-    engine = "sensevoice"
+    engine = "auto"
     for a in args:
         if a.startswith("--engine="):
             engine = a.split("=", 1)[1]
@@ -511,7 +521,7 @@ def main():
         return
     print("=" * 52)
     print("  视频内容一键提取 -> 投喂文件 (免费总结)")
-    print("  支持: B站 / YouTube | 中文:SenseVoice(快) 英文:Parakeet")
+    print("  支持: B站 / YouTube | 中文自动选引擎(短准长快) 英文:Parakeet")
     print("=" * 52)
     while True:
         url = input("\n粘贴 视频链接或BV号 (输入 q 退出): ").strip()
