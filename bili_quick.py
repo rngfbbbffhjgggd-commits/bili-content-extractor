@@ -1,15 +1,15 @@
 #!/usr/bin/env python3
-"""bili_quick.py — B站/YouTube 视频内容一键提取（中文 SenseVoice/Qwen3-ASR 自动选择 / 英文 Parakeet）
+"""bili_quick.py — B站/YouTube 视频内容一键提取（中文多引擎可选 / 英文 Parakeet）
 
 用法:
-  交互模式:   python bili_quick.py           (双击 bat 即可)
+  交互模式:   python bili_quick.py           (双击 bat 即可，粘贴链接后可选引擎)
   直接模式:   python bili_quick.py <链接或BV号>
-  指定语言:   python bili_quick.py <链接> --lang zh|en|auto (默认 auto)
-  指定引擎:   python bili_quick.py <链接> --engine auto|sensevoice|qwen (中文默认 auto: 短准长快)
+  指定语言:   python bili_quick.py <链接> --lang zh|ja|ko|en|auto (默认 auto)
+  指定引擎:   python bili_quick.py <链接> --engine auto|sensevoice|qwen (交互模式会弹菜单)
 
 流程:
   有字幕: 抓字幕 -> txt/srt (B站AI字幕 / YouTube Transcript API)
-  无字幕: 下载音频 -> 自动识别语言 -> 中文(自动选引擎)/Parakeet(英文) 转写
+  无字幕: 下载音频 -> 自动识别语言(中/日/韩/英) -> 交互选择引擎或auto -> 转写
   产物:    投喂文件.md (视频信息 + 指令 + 带时间戳全文) -> 拖进 DeepSeek 网页版即可总结
 输出目录: tools/BilibiliContent/<BV号或yt-视频ID>/
 模型目录: D:\\BiliModels\\ (SenseVoice + Qwen3-ASR + Parakeet)
@@ -158,12 +158,11 @@ def download_audio(bv, cid, outpath):
     return outpath
 
 
-# ---------- 中文转写：SenseVoice（快）/ Qwen3-ASR（准），自动按时长选择 ----------
+# ---------- 中文转写：SenseVoice（快）/ Qwen3-ASR（准） ----------
 
 def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
-    """中文转写：auto 模式按时长选择（短→Qwen3-ASR准，长→SenseVoice快），可强制指定"""
+    """中文/多语转写：auto 模式按时长选择（短→Qwen3-ASR准，长→SenseVoice快），可强制指定"""
     if engine == "auto":
-        # 10 分钟以下用 Qwen3-ASR（准确率优先），以上用 SenseVoice（速度优先）
         engine = "qwen" if duration < 600 else "sensevoice"
         print(f"[√] 自动选择引擎: {'Qwen3-ASR (短视频,更准)' if engine == 'qwen' else 'SenseVoice (长视频,快8倍)'}")
     if engine == "sensevoice":
@@ -207,7 +206,7 @@ def qwen_transcribe(audio_path, outdir, chunk_sec=60):
         audio = np.interp(np.linspace(0, len(audio) - 1, n), np.arange(len(audio)), audio)
     audio = audio.astype(np.float32)
 
-    print(f"[√] 加载 Qwen3-ASR (中文, 22种方言)...")
+    print(f"[√] 加载 Qwen3-ASR (中文/多语, 52语言)...")
     eng = QwenASREngine(QWEN_DIR)
 
     total = len(audio) / SAMPLE_RATE
@@ -269,12 +268,49 @@ def parakeet_transcribe(audio_path):
 # ---------- 语言选择 ----------
 
 def detect_lang(title, desc, manual):
+    """检测语言：日文假名→ja，韩文谚文→ko，中文字符→zh，否则→en
+    （日文优先：日文标题必含假名，且日文汉字与中文共用 CJK 区）"""
     if manual:
         return manual
     text = title + (desc or "")[:200]
-    if re.search(r"[\u4e00-\u9fff]", text):
+    if re.search(r"[\u3040-\u30ff\u31f0-\u31ff]", text):  # 日文假名
+        return "ja"
+    if re.search(r"[\uac00-\ud7af]", text):  # 韩文谚文
+        return "ko"
+    if re.search(r"[\u4e00-\u9fff]", text):  # 中文字符
         return "zh"
     return "en"
+
+
+LANG_NAMES = {"zh": "中文", "ja": "日语", "ko": "韩语", "en": "英文"}
+
+
+def ask_engine(engine, duration):
+    """交互选择中文/多语引擎。engine 已指定（非auto）则直接用；否则弹选项菜单。"""
+    if engine and engine != "auto":
+        return engine
+    try:
+        if not sys.stdin.isatty():
+            return "auto"
+    except Exception:
+        return "auto"
+    dur_min = duration / 60 if duration else 0
+    print(f"\n请选择转写引擎（视频时长约 {dur_min:.0f} 分钟）:")
+    print("  1) auto（推荐，直接回车）— 自动：<10分钟用 Qwen3-ASR（准），≥10分钟用 SenseVoice（快）")
+    print("  2) Qwen3-ASR — 22种方言+标点，准确率最高，多语言52种；适合重要内容/短视频；较慢")
+    print("  3) SenseVoice — 快8倍，中英日韩粤多语；适合长视频/混杂语言；输出无标点")
+    while True:
+        try:
+            c = input("输入数字或直接回车(默认1 auto): ").strip().lower()
+        except EOFError:
+            return "auto"
+        if c in ("", "1", "auto"):
+            return "auto"
+        if c in ("2", "qwen", "qwen3", "qwen3-asr"):
+            return "qwen"
+        if c in ("3", "sensevoice", "sv"):
+            return "sensevoice"
+        print("无效输入，请输入 1/2/3 或直接回车")
 
 
 # ---------- YouTube 支持 ----------
@@ -365,18 +401,19 @@ def run_youtube(url, use_api=False, lang_manual=None, engine="auto"):
             return
         print(f"[√] 音频已下载 {wav}")
         lang = detect_lang(title, "", lang_manual)
-        print(f"[√] 检测语言: {'中文' if lang == 'zh' else '英文'}")
-        if lang == "zh":
+        print(f"[√] 检测语言: {LANG_NAMES.get(lang, lang)}")
+        if lang == "en":
+            segs = parakeet_transcribe(wav)
+            engine_note = "Parakeet-TDT-0.6B (英文)"
+        else:
             import wave as _wave
 
             with _wave.open(wav) as _wf:
                 dur = _wf.getnframes() / _wf.getframerate()
+            engine = ask_engine(engine, dur)
             segs = zh_transcribe(wav, outdir, engine, dur)
-            engine_note = ("SenseVoice (中文, 快8倍)" if engine == "sensevoice"
-                           else "Qwen3-ASR-1.7B (中文/方言)" if engine == "qwen" else "中文引擎(自动)")
-        else:
-            segs = parakeet_transcribe(wav)
-            engine_note = "Parakeet-TDT-0.6B (英文)"
+            engine_note = ("SenseVoice (中文/多语, 快8倍)" if engine == "sensevoice"
+                           else "Qwen3-ASR-1.7B (中文/多语)" if engine == "qwen" else "中文引擎(自动)")
         if segs is None:
             return
         txt_path = os.path.join(outdir, "transcript.txt")
@@ -470,14 +507,15 @@ def run(url, use_api=False, lang_manual=None, engine="auto"):
             print("[x] ffmpeg 转码失败")
             return
         lang = detect_lang(title, data.get("desc", ""), lang_manual)
-        print(f"[√] 检测语言: {'中文' if lang == 'zh' else '英文'}")
-        if lang == "zh":
-            segments = zh_transcribe(wav, outdir, engine, data["duration"])
-            engine_note = ("SenseVoice (中文, 快8倍)" if engine == "sensevoice"
-                           else "Qwen3-ASR-1.7B (中文/方言)" if engine == "qwen" else "中文引擎(自动)")
-        else:
+        print(f"[√] 检测语言: {LANG_NAMES.get(lang, lang)}")
+        if lang == "en":
             segments = parakeet_transcribe(wav)
             engine_note = "Parakeet-TDT-0.6B (英文)"
+        else:
+            engine = ask_engine(engine, data["duration"])
+            segments = zh_transcribe(wav, outdir, engine, data["duration"])
+            engine_note = ("SenseVoice (中文/多语, 快8倍)" if engine == "sensevoice"
+                           else "Qwen3-ASR-1.7B (中文/多语)" if engine == "qwen" else "中文引擎(自动)")
         if segments is None:
             return
         txt_path = os.path.join(outdir, "transcript.txt")
@@ -521,7 +559,7 @@ def main():
         return
     print("=" * 52)
     print("  视频内容一键提取 -> 投喂文件 (免费总结)")
-    print("  支持: B站 / YouTube | 中文自动选引擎(短准长快) 英文:Parakeet")
+    print("  支持: B站 / YouTube | 中文/多语可选手动 英文:Parakeet")
     print("=" * 52)
     while True:
         url = input("\n粘贴 视频链接或BV号 (输入 q 退出): ").strip()
