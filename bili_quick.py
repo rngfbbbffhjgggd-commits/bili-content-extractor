@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bili_quick.py — B站/YouTube 视频内容一键提取（多引擎可选 / 交互菜单）
+"""bili_quick.py — B站/YouTube 视频内容一键提取（多引擎可选 / 内容语言检测）
 
 用法:
   交互模式:   python bili_quick.py           (双击 bat 即可，粘贴链接后可选引擎)
@@ -9,7 +9,7 @@
 
 流程:
   有字幕: 抓字幕 -> txt/srt (B站AI字幕 / YouTube Transcript API)
-  无字幕: 下载音频 -> 自动识别语言(中/日/韩/英) -> 交互选择引擎或auto -> 转写
+  无字幕: 下载音频 -> 内容语言检测(SenseVoice快扫) -> 英文用Parakeet / 其他交互选引擎 -> 转写
   产物:    投喂文件.md (视频信息 + 指令 + 带时间戳全文) -> 拖进 DeepSeek 网页版即可总结
 输出目录: tools/BilibiliContent/<BV号或yt-视频ID>/
 模型目录: D:\\BiliModels\\ (SenseVoice + Qwen3-ASR + Parakeet)
@@ -268,8 +268,7 @@ def parakeet_transcribe(audio_path):
 # ---------- 语言选择 ----------
 
 def detect_lang(title, desc, manual):
-    """检测语言：日文假名→ja，韩文谚文→ko，中文字符→zh，否则→en
-    （日文优先：日文标题必含假名，且日文汉字与中文共用 CJK 区）"""
+    """标题检测（fallback）：日文假名→ja，韩文谚文→ko，中文字符→zh，否则→en"""
     if manual:
         return manual
     text = title + (desc or "")[:200]
@@ -282,7 +281,24 @@ def detect_lang(title, desc, manual):
     return "en"
 
 
-LANG_NAMES = {"zh": "中文", "ja": "日语", "ko": "韩语", "en": "英文"}
+LANG_NAMES = {"zh": "中文", "ja": "日语", "ko": "韩语", "yue": "粤语", "en": "英文"}
+
+
+def decide_lang(title, desc, wav, lang_manual):
+    """语言决策：SenseVoice 内容检测优先（比标题可靠），标题检测为 fallback"""
+    if lang_manual:
+        return lang_manual
+    try:
+        from sensevoice_engine import detect_content_lang
+
+        clang = detect_content_lang(wav)
+        if clang:
+            print(f"[√] 内容语言检测: {LANG_NAMES.get(clang, clang)}")
+            return clang
+        print("[!] 内容检测未返回结果，回退标题判断")
+    except Exception:
+        pass
+    return detect_lang(title, desc, None)
 
 
 def ask_engine(engine, duration):
@@ -403,8 +419,8 @@ def run_youtube(url, use_api=False, lang_manual=None, engine="auto"):
             print("[x] 音频下载失败")
             return
         print(f"[√] 音频已下载 {wav}")
-        lang = detect_lang(title, "", lang_manual)
-        print(f"[√] 检测语言: {LANG_NAMES.get(lang, lang)}")
+        lang = decide_lang(title, "", wav, lang_manual)
+        print(f"[√] 语言: {LANG_NAMES.get(lang, lang)}")
         if lang == "en":
             segs = parakeet_transcribe(wav)
             engine_note = "Parakeet-TDT-0.6B (英文)"
@@ -513,8 +529,8 @@ def run(url, use_api=False, lang_manual=None, engine="auto"):
         if not os.path.exists(wav):
             print("[x] ffmpeg 转码失败")
             return
-        lang = detect_lang(title, data.get("desc", ""), lang_manual)
-        print(f"[√] 检测语言: {LANG_NAMES.get(lang, lang)}")
+        lang = decide_lang(title, data.get("desc", ""), wav, lang_manual)
+        print(f"[√] 语言: {LANG_NAMES.get(lang, lang)}")
         if lang == "en":
             segments = parakeet_transcribe(wav)
             engine_note = "Parakeet-TDT-0.6B (英文)"
@@ -570,7 +586,7 @@ def main():
         return
     print("=" * 52)
     print("  视频内容一键提取 -> 投喂文件 (免费总结)")
-    print("  支持: B站 / YouTube | 引擎: auto/Qwen3-ASR/SenseVoice/Parakeet")
+    print("  支持: B站 / YouTube | 内容语言检测 + 引擎: auto/Qwen3-ASR/SenseVoice/Parakeet")
     print("=" * 52)
     while True:
         url = input("\n粘贴 视频链接或BV号 (输入 q 退出): ").strip()

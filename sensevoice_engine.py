@@ -52,6 +52,28 @@ class SenseVoiceEngine:
         text = re.sub(r"<\|[^|]*\|>", "", text).strip()
         return text
 
+    def detect_lang(self, audio_path, sample_sec=40):
+        """快扫音频前 N 秒，返回内容语言 ('zh'/'en'/'ja'/'ko'/'yue' 等)"""
+        with wave.open(audio_path, "rb") as w:
+            sr = w.getframerate()
+            n = min(w.getnframes(), int(sr * sample_sec))
+            samples = np.frombuffer(w.readframes(n), dtype=np.int16)
+        stream = self.recognizer.create_stream()
+        stream.accept_waveform(sr, samples)
+        self.recognizer.decode_stream(stream)
+        lang = getattr(stream.result, "lang", "") or ""
+        return lang.strip("<>| ")
+
+
+def detect_content_lang(audio_path, sample_sec=40):
+    """SenseVoice 内容语言检测 -> 'zh'/'en'/'ja'/'ko'/'yue'，失败返回 None"""
+    try:
+        eng = SenseVoiceEngine()
+        lang = eng.detect_lang(audio_path, sample_sec)
+        return lang or None
+    except Exception:
+        return None
+
 
 def transcribe_audio(audio_path, outdir, chunk_sec=60):
     """分段转写 -> [(start_sec, text)]（与 Qwen3-ASR 接口一致）"""
