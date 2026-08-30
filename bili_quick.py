@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bili_quick.py — B站视频内容一键提取（中文 Qwen3-ASR / 英文 Parakeet）
+"""bili_quick.py — 视频内容一键提取（B站 / YouTube，中文 Qwen3-ASR / 英文 Parakeet）
 
 用法:
   交互模式:   python bili_quick.py           (双击 bat 即可)
@@ -7,10 +7,10 @@
   指定语言:   python bili_quick.py <链接> --lang zh|en|auto (默认 auto)
 
 流程:
-  有字幕: 抓AI字幕 -> txt/srt
+  有字幕: 抓字幕 -> txt/srt (B站AI字幕 / YouTube Transcript API)
   无字幕: 下载音频 -> 自动识别语言 -> Qwen3-ASR(中文)/Parakeet(英文) 转写
   产物:    投喂文件.md (视频信息 + 指令 + 带时间戳全文) -> 拖进 DeepSeek 网页版即可总结
-输出目录: tools/BilibiliContent/<BV号>/
+输出目录: tools/BilibiliContent/<BV号或yt-视频ID>/
 模型目录: D:\\BiliModels\\ (Qwen3-ASR 1.7B int4 + Parakeet 0.6B GGUF)
 """
 import json
@@ -38,7 +38,7 @@ PARAKET_GGUF = os.environ.get("PARAKET_GGUF", os.path.join(MODELS_ROOT, "parakee
 API_URL = "https://api.deepseek.com/chat/completions"
 UA = bt.UA
 
-SUMMARY_PROMPT = """你是一个专业的视频内容提炼助手。下面是某个B站视频的字幕，每行格式为 [时间] 字幕内容（时间格式 分:秒）。
+SUMMARY_PROMPT = """你是一个专业的视频内容提炼助手。下面是某个视频的字幕，每行格式为 [时间] 字幕内容（时间格式 分:秒）。
 
 请输出一份**详细**的中文总结 Markdown，包含以下四个部分：
 
@@ -70,7 +70,7 @@ def fmt_time(sec):
 
 def build_feed_file(bv, title, owner, duration, segments, outdir, engine_note=""):
     lines = "\n".join(f"[{fmt_time(t)}] {txt}" for t, txt in segments)
-    md = f"""# 📄 B站视频内容投喂包 — 请直接发送给 DeepSeek 网页版
+    md = f"""# 📄 视频内容投喂包 — 请直接发送给 DeepSeek 网页版
 
 ## 【给你的指令】
 请作为视频内容提炼助手，根据下面的【字幕全文】，输出一份**详细**的中文总结 Markdown，包含四个部分：
@@ -85,7 +85,7 @@ def build_feed_file(bv, title, owner, duration, segments, outdir, engine_note=""
 - UP主：{owner}
 - 时长：{duration} 秒
 - 链接：https://www.bilibili.com/video/{bv}
-- 转写引擎：{engine_note or "B站AI字幕"}
+- 转写引擎：{engine_note or "平台字幕"}
 
 ## 【字幕全文】(每行 [分:秒] 内容)
 {lines}
@@ -135,7 +135,7 @@ def api_summarize(segments, outdir):
     print(f"[√] API 总结已保存 -> {path}")
 
 
-# ---------- 音频下载 ----------
+# ---------- 音频下载（B站） ----------
 
 def download_audio(bv, cid, outpath):
     p = bt.get("https://api.bilibili.com/x/player/playurl",
@@ -255,7 +255,138 @@ def detect_lang(title, desc, manual):
     return "en"
 
 
-# ---------- 主流程 ----------
+# ---------- YouTube 支持 ----------
+
+def parse_youtube_id(url):
+    m = re.search(r"(?:youtu\.be/|watch\?v=|shorts/|embed/|live/)([A-Za-z0-9_-]{11})", url)
+    return m.group(1) if m else None
+
+
+def youtube_meta(video_id):
+    """oEmbed API 获取标题/作者（无需登录）"""
+    try:
+        u = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+        req = urllib.request.Request(u, headers={"User-Agent": UA})
+        with urllib.request.urlopen(req, timeout=30) as r:
+            d = json.load(r)
+        return d.get("title", ""), d.get("author_name", "")
+    except Exception:
+        return video_id, "YouTube"
+
+
+def youtube_subtitles(video_id):
+    """youtube-transcript-api 获取字幕 -> [(start, text)]（字幕优先路径）"""
+    try:
+        from youtube_transcript_api import YouTubeTranscriptApi
+    except ImportError:
+        return None, "缺少 youtube-transcript-api，请 pip install youtube-transcript-api"
+    try:
+        api = YouTubeTranscriptApi()
+        for lang in (["zh-Hans", "zh-CN", "zh", "en"], None):
+            try:
+                if lang:
+                    tr = api.fetch(video_id, languages=lang)
+                else:
+                    tr = api.fetch(video_id)
+                segs = [(float(s.start), s.text.replace("\n", " ")) for s in tr]
+                return segs, None
+            except Exception:
+                continue
+        return None, "该视频没有可用字幕"
+    except Exception as e:
+        return None, f"字幕获取失败: {type(e).__name__}: {str(e)[:120]}"
+
+
+def download_youtube_audio(video_id, outdir):
+    """yt-dlp 下载最佳音频并转 16k mono wav"""
+    url = f"https://www.youtube.com/watch?v={video_id}"
+    out = os.path.join(outdir, "yt_audio.%(ext)s")
+    cmd = [sys.executable, "-m", "yt_dlp", "-x", "--audio-format", "wav",
+           "--audio-quality", "0", "--postprocessor-args", "ffmpeg:-ar 16000 -ac 1",
+           "-o", out, url]
+    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=1800)
+    if proc.returncode != 0:
+        print("[x] yt-dlp 下载失败:", proc.stderr[-300:])
+        return None
+    wav = os.path.join(outdir, "yt_audio.wav")
+    if os.path.exists(wav):
+        return wav
+    import glob
+    hits = glob.glob(os.path.join(outdir, "yt_audio*.wav"))
+    return hits[0] if hits else None
+
+
+def run_youtube(url, use_api=False, lang_manual=None):
+    video_id = parse_youtube_id(url)
+    if not video_id:
+        print("[x] 无法解析 YouTube 链接")
+        return
+    title, author = youtube_meta(video_id)
+    print(f"[√] {title}  |  UP主: {author}")
+    outdir = os.path.join(OUT_ROOT, f"yt-{video_id}")
+    os.makedirs(outdir, exist_ok=True)
+
+    # 1) 字幕优先（免费、无需下载）
+    segs, err = youtube_subtitles(video_id)
+    engine_note = "YouTube 字幕"
+    if segs:
+        print(f"[√] 字幕 {len(segs)} 条")
+        txt_path = os.path.join(outdir, "youtube_subtitle.txt")
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(f"[{fmt_time(t)}] {x}" for t, x in segs))
+    else:
+        # 2) 无字幕 -> 音频转写
+        print(f"\n[!] 无字幕（{err}），走音频转写兜底 ...")
+        wav = download_youtube_audio(video_id, outdir)
+        if not wav:
+            print("[x] 音频下载失败")
+            return
+        print(f"[√] 音频已下载 {wav}")
+        lang = detect_lang(title, "", lang_manual)
+        print(f"[√] 检测语言: {'中文' if lang == 'zh' else '英文'}")
+        if lang == "zh":
+            segs = qwen_transcribe(wav, outdir)
+            engine_note = "Qwen3-ASR-1.7B (中文/方言)"
+        else:
+            segs = parakeet_transcribe(wav)
+            engine_note = "Parakeet-TDT-0.6B (英文)"
+        if segs is None:
+            return
+        txt_path = os.path.join(outdir, "transcript.txt")
+        with open(txt_path, "w", encoding="utf-8") as f:
+            f.write("\n".join(f"[{fmt_time(t)}] {x}" for t, x in segs))
+        print(f"[√] 转写完成 {len(segs)} 段")
+
+    # 生成投喂文件
+    feed = build_feed_file(f"yt-{video_id}", title, author, 0, segs, outdir, engine_note)
+    print(f"\n{'='*52}")
+    print(f"  ✅ 已生成投喂文件:")
+    print(f"     {feed}")
+    print(f"{'='*52}")
+    print("  下一步: 把该文件拖进 DeepSeek 网页版 (chat.deepseek.com)")
+
+    if use_api:
+        api_summarize(segs, outdir)
+    try:
+        webbrowser.open("https://chat.deepseek.com")
+        os.startfile(outdir)
+        print("\n[√] 已自动打开 DeepSeek 网页版和文件所在文件夹，把 md 拖进去即可")
+    except (EOFError, KeyboardInterrupt, OSError):
+        pass
+
+
+# ---------- 平台分发 ----------
+
+def run_any(url, use_api=False, lang_manual=None):
+    if "bilibili.com" in url or "b23.tv" in url or re.search(r"BV[0-9A-Za-z]{10}", url):
+        run(url, use_api, lang_manual)
+    elif "youtube.com" in url or "youtu.be" in url:
+        run_youtube(url, use_api, lang_manual)
+    else:
+        print("[x] 不支持的平台（目前支持: B站 / YouTube）")
+
+
+# ---------- B站主流程 ----------
 
 def run(url, use_api=False, lang_manual=None):
     bv = bt.parse_bv(url)
@@ -306,7 +437,6 @@ def run(url, use_api=False, lang_manual=None):
         except Exception as e:
             print(f"[x] 音频下载失败: {e}")
             return
-        # 统一转 16k mono wav（m4s 需转码）
         wav = os.path.join(outdir, "audio_16k.wav")
         subprocess.run(["ffmpeg", "-y", "-i", audio, "-ar", "16000", "-ac", "1", wav],
                        capture_output=True, timeout=600)
@@ -328,7 +458,6 @@ def run(url, use_api=False, lang_manual=None):
             f.write("\n".join(f"[{fmt_time(t)}] {x}" for t, x in segments))
         print(f"[√] 转写完成 {len(segments)} 段")
 
-    # 生成投喂文件（默认，不消耗 token）
     feed = build_feed_file(bv, title, owner, duration, segments, outdir, engine_note)
     print(f"\n{'='*52}")
     print(f"  ✅ 已生成投喂文件:")
@@ -357,20 +486,20 @@ def main():
             lang_manual = a.split("=", 1)[1]
     args = [a for a in args if not a.startswith("--lang")]
     if args:
-        run(args[0], use_api, lang_manual)
+        run_any(args[0], use_api, lang_manual)
         return
     print("=" * 52)
-    print("  B站视频内容一键提取 -> 投喂文件 (免费总结)")
-    print("  中文:Qwen3-ASR 英文:Parakeet 本地转写")
+    print("  视频内容一键提取 -> 投喂文件 (免费总结)")
+    print("  支持: B站 / YouTube | 中文:Qwen3-ASR 英文:Parakeet")
     print("=" * 52)
     while True:
-        url = input("\n粘贴 B站视频链接或BV号 (输入 q 退出): ").strip()
+        url = input("\n粘贴 视频链接或BV号 (输入 q 退出): ").strip()
         if url.lower() in ("q", "quit", "exit"):
             break
         if not url:
             continue
         try:
-            run(url, use_api, lang_manual)
+            run_any(url, use_api, lang_manual)
         except KeyboardInterrupt:
             break
         except SystemExit as e:

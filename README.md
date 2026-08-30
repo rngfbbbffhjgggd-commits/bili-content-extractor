@@ -1,30 +1,31 @@
-# 📺 Bili Content Extractor（B站视频内容一键提取）
+# 📺 Bili Content Extractor（B站/YouTube 视频内容一键提取）
 
 **[English](README_EN.md) · 中文**
 
-把任意 B 站视频变成**可读文本 + 可投喂的总结材料**，全程本地、免费、不消耗 token。
+把 **B站 / YouTube** 视频变成**可读文本 + 可投喂的总结材料**，全程本地、免费、不消耗 token。
 
 ![工作流程](docs/flow.svg)
 
 ```
-B站视频链接
+B站 / YouTube 视频链接
    │
-   ├─ 有 AI 字幕 ──→ 直接下载字幕（txt / srt）
+   ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
-   └─ 无 AI 字幕 ──→ 自动检测语言，本地转写
-                      ├─ 中文/方言 → Qwen3-ASR-1.7B（22种方言，快且准）
-                      └─ 英文      → Parakeet-TDT-0.6B（词级时间戳，RTF 0.16）
-                            │
-                            ▼
-              生成「投喂文件.md」（视频信息 + 指令 + 带时间戳全文）
-                            │
-                            ▼
-        拖进 DeepSeek 网页版 → 免费得到详细时间线总结（不花 token）
+   └─ 无字幕 ──→ 自动检测语言，本地转写
+                  ├─ 中文/方言 → Qwen3-ASR-1.7B（22种方言，快且准）
+                  └─ 英文      → Parakeet-TDT-0.6B（词级时间戳，RTF 0.16）
+                        │
+                        ▼
+          生成「投喂文件.md」（视频信息 + 指令 + 带时间戳全文）
+                        │
+                        ▼
+    拖进 DeepSeek 网页版 → 免费得到详细时间线总结（不花 token）
 ```
 
 ## ✨ 特性
 
-- **字幕优先**：有 AI 字幕的视频直接下载，零成本零延迟
+- **多平台**：支持 **B站**（AI 字幕优先）和 **YouTube**（Transcript API 免费字幕，无字幕自动转写）
+- **字幕优先**：有字幕的视频直接下载，零成本零延迟
 - **中文方言识别**：Qwen3-ASR 支持 22 种中文方言，口语/快语速/吐字不清场景显著优于 Whisper
 - **英文词级时间戳**：Parakeet 每个词带时间戳+置信度，噪声鲁棒性超 Whisper
 - **免费总结**：产出带指令的投喂文件，配合 DeepSeek **网页版**免费总结，不消耗 API token
@@ -81,20 +82,23 @@ B 站的 AI 字幕列表**需要登录态**才能获取：
 
 > 🔒 cookie 仅保存在本地、只用于调用 B 站接口，不会上传；约一个月过期，过期后重新复制即可。
 
+> 💡 **YouTube 不需要 cookie**：字幕走免费 Transcript API，音频走 yt-dlp，无需任何登录。
+
 ## 🎯 使用
 
 **Windows 一键版**：双击 `B站一键提取.bat` → 粘贴链接 → 回车。
 
 **命令行**：
 ```bash
-python bili_quick.py "https://www.bilibili.com/video/BVxxxx"   # 自动检测语言
-python bili_quick.py <链接> --lang=zh                          # 强制中文
-python bili_quick.py <链接> --lang=en                          # 强制英文
-python bili_quick.py <链接> --api                              # 可选：用 DeepSeek API 自动总结（消耗 token）
+python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # B站
+python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
+python bili_quick.py <链接> --lang=zh                                 # 强制中文
+python bili_quick.py <链接> --lang=en                                 # 强制英文
+python bili_quick.py <链接> --api                                     # 可选：用 DeepSeek API 自动总结（消耗 token）
 ```
 
-**产物**（`BilibiliContent/<BV号>/`）：
-- 有字幕：`P1_ai-zh.txt` / `.srt`
+**产物**（`BilibiliContent/<BV号或yt-视频ID>/`）：
+- 有字幕：`P1_ai-zh.txt` / `.srt` 或 `youtube_subtitle.txt`
 - 无字幕：`transcript.txt` + `投喂DeepSeek网页版.md`
 - 投喂文件内含完整指令，拖进 [chat.deepseek.com](https://chat.deepseek.com) 回车即可得到详细时间线总结
 
@@ -106,15 +110,15 @@ python bili_quick.py <链接> --api                              # 可选：用 
 | `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR 模型目录 |
 | `PARAKET_EXE` | `<MODELS_ROOT>\parakeet\...\parakeet-cli.exe` | parakeet 可执行文件 |
 | `PARAKET_GGUF` | `<MODELS_ROOT>\parakeet\tdt-0.6b-v3-q4_k.gguf` | parakeet 模型 |
-| `BILI_COOKIE_FILE` | `./cookie.txt` | cookie 文件路径 |
+| `BILI_COOKIE_FILE` | `./cookie.txt` | cookie 文件路径（仅 B站） |
 | `BILI_DEEPSEEK_KEY_FILE` | `./deepseek_key.txt` | DeepSeek key 文件路径（仅 `--api` 用） |
 
 ## ⚖️ 免责声明
 
-- 本项目仅用于个人学习与研究，字幕/音频内容版权归原作者与 B 站所有
+- 本项目仅用于个人学习与研究，字幕/音频内容版权归原作者与平台所有
 - 请遵守 [Bilibili 服务条款](https://www.bilibili.com/blackboard/activity-9pg6xIqxDZ.html) 及视频版权规定
 - 请勿用于商业用途或大规模抓取
-- 本项目与哔哩哔哩官方无任何关联
+- 本项目与哔哩哔哩、YouTube 官方无任何关联
 
 ## 📄 License
 

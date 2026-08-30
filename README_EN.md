@@ -1,15 +1,15 @@
 # 📺 Bili Content Extractor
 
-One-click extraction of content from any Bilibili video: **AI subtitles first, local transcription as fallback, free AI summary** — all local, no token cost.
+One-click extraction of content from **Bilibili & YouTube** videos: **subtitles first, local transcription as fallback, free AI summary** — all local, no token cost.
 
 **[中文文档](README.md)**
 
 ![Workflow](docs/flow.svg)
 
 ```
-Bilibili video URL
+Bilibili / YouTube video URL
    │
-   ├─ Has AI subtitles ──→ Download subtitles directly (txt / srt)
+   ├─ Has subtitles ──→ Download subtitles directly (Bilibili AI subs / YouTube Transcript API)
    │
    └─ No subtitles ──→ Auto language detection + local transcription
                        ├─ Chinese/dialects → Qwen3-ASR-1.7B (22 dialects, fast & accurate)
@@ -24,7 +24,8 @@ Bilibili video URL
 
 ## ✨ Features
 
-- **Subtitles first**: videos with AI subtitles are downloaded directly — zero cost, zero delay
+- **Multi-platform**: **Bilibili** (AI subtitles first) + **YouTube** (free Transcript API subtitles, auto-transcribe when missing)
+- **Subtitles first**: videos with subtitles are downloaded directly — zero cost, zero delay
 - **Chinese dialect support**: Qwen3-ASR handles 22 Chinese dialects; significantly better than Whisper on casual speech, fast talkers, and unclear articulation
 - **English word-level timestamps**: Parakeet outputs per-word timestamps + confidence; more noise-robust than Whisper
 - **Free summaries**: generates a self-contained prompt file for **DeepSeek web** — get a detailed timeline summary for free, no API token consumed
@@ -70,7 +71,7 @@ D:\BiliModels\parakeet\
 > python parallel_download.py <url> <output_path> 16 2
 > ```
 
-## 🔑 Configure Bilibili Cookie (one-time)
+## 🔑 Configure Bilibili Cookie (one-time, Bilibili only)
 
 Bilibili's AI subtitle list **requires a logged-in session**:
 
@@ -81,20 +82,23 @@ Bilibili's AI subtitle list **requires a logged-in session**:
 
 > 🔒 The cookie stays local and is only used to call Bilibili's API. It expires in about a month — just re-copy it then.
 
+> 💡 **YouTube needs no cookie**: free Transcript API for subtitles, yt-dlp for audio — no login required.
+
 ## 🎯 Usage
 
 **Windows one-click**: double-click `B站一键提取.bat` → paste a link → Enter.
 
 **CLI**: 
 ```bash
-python bili_quick.py "https://www.bilibili.com/video/BVxxxx"   # auto language detection
-python bili_quick.py <url> --lang=zh                          # force Chinese
-python bili_quick.py <url> --lang=en                          # force English
-python bili_quick.py <url> --api                              # optional: auto-summarize via DeepSeek API (costs tokens)
+python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # Bilibili
+python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
+python bili_quick.py <url> --lang=zh                                 # force Chinese
+python bili_quick.py <url> --lang=en                                 # force English
+python bili_quick.py <url> --api                                     # optional: auto-summarize via DeepSeek API (costs tokens)
 ```
 
-**Outputs** (in `BilibiliContent/<BV-id>/`):
-- With subtitles: `P1_ai-zh.txt` / `.srt`
+**Outputs** (in `BilibiliContent/<BV-id-or-yt-id>/`):
+- With subtitles: `P1_ai-zh.txt` / `.srt` or `youtube_subtitle.txt`
 - Without subtitles: `transcript.txt` + `prompt file.md`
 - The prompt file contains full instructions — paste it into [chat.deepseek.com](https://chat.deepseek.com) for a detailed timeline summary
 
@@ -106,15 +110,15 @@ python bili_quick.py <url> --api                              # optional: auto-s
 | `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR model dir |
 | `PARAKET_EXE` | `<MODELS_ROOT>\parakeet\...\parakeet-cli.exe` | parakeet executable |
 | `PARAKET_GGUF` | `<MODELS_ROOT>\parakeet\tdt-0.6b-v3-q4_k.gguf` | parakeet model |
-| `BILI_COOKIE_FILE` | `./cookie.txt` | cookie file path |
+| `BILI_COOKIE_FILE` | `./cookie.txt` | cookie file path (Bilibili only) |
 | `BILI_DEEPSEEK_KEY_FILE` | `./deepseek_key.txt` | DeepSeek key file (only for `--api`) |
 
 ## ⚖️ Disclaimer
 
-- For personal learning and research only; subtitle/audio content belongs to the original creators and Bilibili
+- For personal learning and research only; subtitle/audio content belongs to the original creators and platforms
 - Respect [Bilibili Terms of Service](https://www.bilibili.com/blackboard/activity-9pg6xIqxDZ.html) and video copyright
 - Not for commercial use or large-scale scraping
-- Not affiliated with Bilibili
+- Not affiliated with Bilibili or YouTube
 
 ## 📄 License
 
