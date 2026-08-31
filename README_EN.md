@@ -112,8 +112,8 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # Bilibili
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <url> --lang=zh                                 # force Chinese
 python bili_quick.py <url> --lang=en                                 # force English
-python bili_quick.py <url> --engine=qwen                            # force Qwen3-1.7B (most accurate)
-python bili_quick.py <url> --engine=qwen06                          # force Qwen3-0.6B (long-video tier)
+python bili_quick.py <url> --engine=qwen                            # force Qwen3-ASR-1.7B (most accurate)
+python bili_quick.py <url> --engine=qwen06                          # force Qwen3-ASR-0.6B (long-video tier)
 python bili_quick.py <url> --engine=funasr                          # force Fun-ASR-Nano (en/ja/yue)
 python bili_quick.py <url> --engine=sensevoice                      # SenseVoice (ultra-fast, no punctuation)
 python bili_quick.py <url> --api                                     # optional: auto-summarize via DeepSeek API (costs tokens)

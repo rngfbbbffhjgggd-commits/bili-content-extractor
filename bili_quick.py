@@ -161,7 +161,7 @@ def download_audio(bv, cid, outpath):
 # ---------- 中文转写：Qwen3-ASR（1.7B 最准 / 0.6B 长视频快档） ----------
 
 def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
-    """中文转写：auto → <10分钟用 Qwen3-1.7B（最准），≥10分钟用 Qwen3-0.6B（快档）
+    """中文转写：auto → <10分钟用 Qwen3-ASR-1.7B（最准），≥10分钟用 Qwen3-ASR-0.6B（快档）
     可强制指定 funasr / sensevoice / qwen / qwen06"""
     if engine == "auto":
         engine = "qwen06" if duration >= 600 else "qwen"
@@ -173,7 +173,7 @@ def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
             print("[√] 中文转写引擎: Fun-ASR-Nano-2512 (标点+热词)")
             return fn_transcribe(audio_path, outdir)
         except (ImportError, FileNotFoundError) as e:
-            print(f"[!] funasr-nano 不可用 ({e})，回退 Qwen3-1.7B")
+            print(f"[!] funasr-nano 不可用 ({e})，回退 Qwen3-ASR-1.7B")
             engine = "qwen"
     if engine == "sensevoice":
         try:
@@ -182,9 +182,9 @@ def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
             print("[√] 中文转写引擎: SenseVoice (RTF<0.1, 快8倍, 无标点)")
             return sv_transcribe(audio_path, outdir)
         except ImportError:
-            print("[!] sensevoice_engine 不可用，回退 Qwen3-1.7B")
+            print("[!] sensevoice_engine 不可用，回退 Qwen3-ASR-1.7B")
         except FileNotFoundError as e:
-            print(f"[!] {e}，回退 Qwen3-1.7B")
+            print(f"[!] {e}，回退 Qwen3-ASR-1.7B")
         engine = "qwen"
     if engine == "qwen06":
         print(f"[√] 加载 Qwen3-ASR-0.6B (长视频快档)...")
@@ -252,9 +252,9 @@ def qwen_transcribe(audio_path, outdir, chunk_sec=60, model_dir=None):
 
 def transcribe_with_engine(wav, outdir, lang, duration, engine):
     """引擎分发:
-       中文      → <10分钟 Qwen3-1.7B（最准），≥10分钟 Qwen3-0.6B（快档）
+       中文      → <10分钟 Qwen3-ASR-1.7B（最准），≥10分钟 Qwen3-ASR-0.6B（快档）
        英/日/粤  → Fun-ASR-Nano fp16（英文最优解，标点+热词，支持中英混说）
-       其他语言  → Qwen3-1.7B 兜底（52 语言）
+       其他语言  → Qwen3-ASR-1.7B 兜底（52 语言）
        Parakeet 已移除（无标点）
     返回 (segments, engine_note)"""
     if engine == "parakeet":
@@ -327,7 +327,7 @@ def ask_engine(engine, duration):
         return "auto"
     dur_min = duration / 60 if duration else 0
     print(f"\n请选择转写引擎（视频时长约 {dur_min:.0f} 分钟）:")
-    print("  1) auto（推荐，直接回车）— 中文<10分钟用 Qwen3-1.7B（最准），≥10分钟用 Qwen3-0.6B（快档）")
+    print("  1) auto（推荐，直接回车）— 中文<10分钟用 Qwen3-ASR-1.7B（最准），≥10分钟用 Qwen3-ASR-0.6B（快档）")
     print("  2) Qwen3-ASR-1.7B — 中文最准，多语言52种；较慢")
     print("  3) Qwen3-ASR-0.6B — 中文长视频快档（比1.7B快约2倍）")
     print("  4) SenseVoice — 极速无标点；仅对比用")

@@ -112,8 +112,8 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # B站
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <链接> --lang=zh                                 # 强制中文
 python bili_quick.py <链接> --lang=en                                 # 强制英文
-python bili_quick.py <链接> --engine=qwen                            # 中文强制 Qwen3-1.7B（最准）
-python bili_quick.py <链接> --engine=qwen06                          # 中文强制 Qwen3-0.6B（长视频快档）
+python bili_quick.py <链接> --engine=qwen                            # 中文强制 Qwen3-ASR-1.7B（最准）
+python bili_quick.py <链接> --engine=qwen06                          # 中文强制 Qwen3-ASR-0.6B（长视频快档）
 python bili_quick.py <链接> --engine=funasr                          # 强制 Fun-ASR-Nano（英/日/粤）
 python bili_quick.py <链接> --engine=sensevoice                      # SenseVoice（极速，无标点）
 python bili_quick.py <链接> --api                                     # 可选：用 DeepSeek API 自动总结（消耗 token）
