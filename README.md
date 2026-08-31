@@ -12,8 +12,9 @@ B站 / YouTube 视频链接
    ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
    └─ 无字幕 ──→ 自动检测语言，本地转写
-                  ├─ 中文 → 自动选引擎（<10分钟 Qwen3-ASR 更准 / ≥10分钟 SenseVoice 快8倍）
-                  └─ 英文 → Parakeet-TDT-0.6B（词级时间戳，RTF 0.16）
+                  ├─ 中/英/日 → Fun-ASR-Nano-2512（主力：快+准+标点，7方言26口音）
+                  ├─ 韩语等   → Qwen3-ASR-1.7B 兜底（52 语言）
+                  └─ 手动     → SenseVoice（极速无标点）/ Parakeet（英文词级时间戳）
                         │
                         ▼
           生成「投喂文件.md」（视频信息 + 指令 + 带时间戳全文）
@@ -26,11 +27,12 @@ B站 / YouTube 视频链接
 
 - **多平台**：支持 **B站**（AI 字幕优先）和 **YouTube**（Transcript API 免费字幕，无字幕自动转写）
 - **字幕优先**：有字幕的视频直接下载，零成本零延迟
-- **中文引擎自动选择**：短视频用 Qwen3-ASR（22 方言，更准），长视频用 SenseVoice（RTF<0.1 快 8 倍），无需手动切换
-- **英文词级时间戳**：Parakeet 每个词带时间戳+置信度，噪声鲁棒性超 Whisper
+- **主力引擎 Fun-ASR-Nano-2512**：通义 2025-12 新一代模型（0.8B，sherpa-onnx fp16），中英日 + 7 大方言 + 26 种口音，自带标点/ITN/热词；10 分钟视频约 4-6 分钟转完（质量优先，标点完整）
+- **韩语等兜底**：内容语言检测到韩语/其他语言自动切换 Qwen3-ASR（52 语言）
+- **英文词级时间戳**（手动）：Parakeet 每个词带时间戳+置信度，噪声鲁棒性超 Whisper
 - **免费总结**：产出带指令的投喂文件，配合 DeepSeek **网页版**免费总结，不消耗 API token
 - **全程本地**：音频转写完全本地运行，不上传
-- **硬盘友好**：模型约 5GB，可放任意盘（默认 `D:\BiliModels`，环境变量可改）
+- **硬盘友好**：模型约 6GB，可放任意盘（默认 `D:\BiliModels`，环境变量可改）
 
 ## 📦 环境要求
 
@@ -46,23 +48,32 @@ cd bili-content-extractor
 pip install -r requirements.txt
 ```
 
-## 🤖 模型下载（约 5GB，放 `D:\BiliModels` 或自定义目录）
+## 🤖 模型下载（约 6GB，放 `D:\BiliModels` 或自定义目录）
 
-### 中文（默认，极速）：SenseVoice（int8 ONNX，239MB）
+### 主力（推荐）：Fun-ASR-Nano-2512（fp16 ONNX，约 2GB）
+
+一键下载（走 hf-mirror 国内镜像 + 分片并行，断点续传）：
+```bash
+python download_funasr_nano.py
+```
+模型落到 `D:\BiliModels\funasr-nano\`（官方 sherpa-onnx 导出，中/英/日 + 7 方言 + 26 口音，自带标点/ITN）。
+> ⚠️ 必须用 **fp16** 版 llm——int8 版有复读退化 bug（[sherpa-onnx issue #3062](https://github.com/k2-fsa/sherpa-onnx/issues/3062)）。
+
+### 中文（可选，极速）：SenseVoice（int8 ONNX，239MB）
 
 从 [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) 下载 `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2`，解压到：
 ```
 D:\BiliModels\sensevoice\
 ```
-> ⚡ SenseVoice：RTF<0.1，10 分钟中文视频约 50 秒转完。
+> ⚡ SenseVoice：RTF<0.1，10 分钟中文视频约 50 秒转完；输出无标点。
 
-### 中文（可选，高准确率）：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
+### 中文（可选，兜底）：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
 
 从 [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) 下载 `qwen3-asr-1.7b-int4.tar.gz`，解压到：
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
-> 短（<10 分钟）视频自动用它；也可 `--engine=qwen` 强制（22 种方言，更准但慢 8 倍）。
+> 自动规则中韩语/其他语言（52 种）兜底走它；也可 `--engine=qwen` 强制。
 
 ### 英文：Parakeet-TDT-0.6B（675MB）
 
@@ -74,6 +85,7 @@ D:\BiliModels\parakeet\parakeet-v0.5.0-bin-win-cpu-x64\
 ```
 D:\BiliModels\parakeet\
 ```
+> 仅手动选项：词级时间戳 / 逐字保真（英文，无标点）。
 
 > 💡 网络不稳时可用仓库自带的 `parallel_download.py` 分片并行下载（快 300 倍）：
 > ```bash
@@ -91,8 +103,6 @@ B 站的 AI 字幕列表**需要登录态**才能获取：
 
 > 🔒 cookie 仅保存在本地、只用于调用 B 站接口，不会上传；约一个月过期，过期后重新复制即可。
 
-> 💡 **YouTube 不需要 cookie**：字幕走免费 Transcript API，音频走 yt-dlp，无需任何登录。
-
 ## 🎯 使用
 
 **Windows 一键版**：双击 `B站一键提取.bat` → 粘贴链接 → 回车。
@@ -103,12 +113,15 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # B站
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <链接> --lang=zh                                 # 强制中文
 python bili_quick.py <链接> --lang=en                                 # 强制英文
-python bili_quick.py <链接> --engine=auto|sensevoice|qwen            # 可选：强制中文引擎（默认auto: 短准长快）
+python bili_quick.py <链接> --engine=funasr                          # 主力：Fun-ASR-Nano（默认）
+python bili_quick.py <链接> --engine=qwen                            # Qwen3-ASR（52语言兜底）
+python bili_quick.py <链接> --engine=sensevoice                      # SenseVoice（极速，无标点）
+python bili_quick.py <链接> --engine=parakeet                        # Parakeet（仅英文，词级时间戳）
 python bili_quick.py <链接> --api                                     # 可选：用 DeepSeek API 自动总结（消耗 token）
 ```
 
-**产物**（`BilibiliContent/<BV号或yt-视频ID>/`）：
-- 有字幕：`P1_ai-zh.txt` / `.srt` 或 `youtube_subtitle.txt`
+**产物**（`BilibiliContent/<BV号>/`）：
+- 有字幕：`P1_ai-zh.txt` / `.srt`
 - 无字幕：`transcript.txt` + `投喂DeepSeek网页版.md`
 - 投喂文件内含完整指令，拖进 [chat.deepseek.com](https://chat.deepseek.com) 回车即可得到详细时间线总结
 
@@ -117,19 +130,19 @@ python bili_quick.py <链接> --api                                     # 可选
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `BILI_MODELS_ROOT` | `D:\BiliModels` | 模型根目录 |
+| `FUNASR_DIR` | `<MODELS_ROOT>\funasr-nano` | Fun-ASR-Nano 模型目录 |
 | `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR 模型目录 |
-| `SENSEVOICE_DIR` | `<MODELS_ROOT>\sensevoice\...` | SenseVoice 模型目录 |
 | `PARAKET_EXE` | `<MODELS_ROOT>\parakeet\...\parakeet-cli.exe` | parakeet 可执行文件 |
 | `PARAKET_GGUF` | `<MODELS_ROOT>\parakeet\tdt-0.6b-v3-q4_k.gguf` | parakeet 模型 |
-| `BILI_COOKIE_FILE` | `./cookie.txt` | cookie 文件路径（仅 B站） |
+| `BILI_COOKIE_FILE` | `./cookie.txt` | cookie 文件路径 |
 | `BILI_DEEPSEEK_KEY_FILE` | `./deepseek_key.txt` | DeepSeek key 文件路径（仅 `--api` 用） |
 
 ## ⚖️ 免责声明
 
-- 本项目仅用于个人学习与研究，字幕/音频内容版权归原作者与平台所有
+- 本项目仅用于个人学习与研究，字幕/音频内容版权归原作者与 B 站所有
 - 请遵守 [Bilibili 服务条款](https://www.bilibili.com/blackboard/activity-9pg6xIqxDZ.html) 及视频版权规定
 - 请勿用于商业用途或大规模抓取
-- 本项目与哔哩哔哩、YouTube 官方无任何关联
+- 本项目与哔哩哔哩官方无任何关联
 
 ## 📄 License
 
