@@ -9,8 +9,8 @@
 流程:
   有字幕: 抓AI字幕 -> txt/srt
   无字幕: 下载音频 -> SenseVoice 内容语言检测 ->
-          中文<10分钟 → Qwen3-ASR-1.7B（最准）/ 中文≥10分钟 → Qwen3-ASR-0.6B（快档）
-          英/日/粤 → Fun-ASR-Nano fp16（标点+热词）
+          <10分钟（任意语言） → Qwen3-ASR-1.7B（最准）
+          ≥10分钟: 中文 → Qwen3-ASR-0.6B（快档）/ 英日粤 → Fun-ASR-Nano fp16（快档）
   产物:    投喂文件.md (视频信息 + 指令 + 带时间戳全文) -> 拖进 DeepSeek 网页版即可总结
 输出目录: tools/BilibiliContent/<BV号>/
 模型目录: D:\\BiliModels\\ (Qwen3-ASR 1.7B + 0.6B + Fun-ASR-Nano fp16 + SenseVoice)
@@ -161,8 +161,8 @@ def download_audio(bv, cid, outpath):
 # ---------- 中文转写：Qwen3-ASR（1.7B 最准 / 0.6B 长视频快档） ----------
 
 def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
-    """中文转写：auto → <10分钟用 Qwen3-ASR-1.7B（最准），≥10分钟用 Qwen3-ASR-0.6B（快档）
-    可强制指定 funasr / sensevoice / qwen / qwen06"""
+    """转写调度：auto → <10分钟用 Qwen3-ASR-1.7B（最准），≥10分钟中文用 Qwen3-ASR-0.6B
+    英日粤长视频由调用方传入 funasr；可强制指定 funasr / sensevoice / qwen / qwen06"""
     if engine == "auto":
         engine = "qwen06" if duration >= 600 else "qwen"
         print(f"[√] 自动选择引擎: {'Qwen3-ASR-0.6B (长视频,快档)' if engine == 'qwen06' else 'Qwen3-ASR-1.7B (短视频,最准)'}")
@@ -170,7 +170,7 @@ def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
         try:
             from funasr_nano_engine import transcribe_audio as fn_transcribe
 
-            print("[√] 中文转写引擎: Fun-ASR-Nano-2512 (标点+热词)")
+            print("[√] 转写引擎: Fun-ASR-Nano-2512 (标点+热词)")
             return fn_transcribe(audio_path, outdir)
         except (ImportError, FileNotFoundError) as e:
             print(f"[!] funasr-nano 不可用 ({e})，回退 Qwen3-ASR-1.7B")
@@ -251,29 +251,32 @@ def qwen_transcribe(audio_path, outdir, chunk_sec=60, model_dir=None):
 # ---------- 引擎分发（统一入口，用户拍板方案） ----------
 
 def transcribe_with_engine(wav, outdir, lang, duration, engine):
-    """引擎分发:
-       中文      → <10分钟 Qwen3-ASR-1.7B（最准），≥10分钟 Qwen3-ASR-0.6B（快档）
-       英/日/粤  → Fun-ASR-Nano fp16（英文最优解，标点+热词，支持中英混说）
-       其他语言  → Qwen3-ASR-1.7B 兜底（52 语言）
+    """引擎分发（统一双档方案）:
+       <10分钟（任意语言） → Qwen3-ASR-1.7B（最准，52语言）
+       ≥10分钟: 中文 → Qwen3-ASR-0.6B（中文快档）
+                英/日/粤 → Fun-ASR-Nano fp16（快档，标点+热词）
+       其他语言 → Qwen3-ASR-1.7B 兜底
        Parakeet 已移除（无标点）
     返回 (segments, engine_note)"""
     if engine == "parakeet":
         print("[!] Parakeet 已移除（输出无标点），改用自动方案")
         engine = "auto"
-    if lang in ("en", "ja", "yue"):
-        # 英/日/粤 → Fun-ASR-Nano（唯一本地英文最优解）
-        segs = zh_transcribe(wav, outdir, "funasr", duration)
-        return segs, "Fun-ASR-Nano-2512 (英/日/粤, 标点+热词)"
-    # 中文 + 其他语言：菜单选择（auto 按时长切 1.7B/0.6B；其他语言兜底 1.7B）
     engine = ask_engine(engine, duration)
     if engine == "auto":
-        engine = "qwen06" if duration >= 600 else "qwen"
-        print(f"[√] 自动选择引擎: {'Qwen3-ASR-0.6B (长视频,快档)' if engine == 'qwen06' else 'Qwen3-ASR-1.7B (短视频,最准)'}")
+        if duration < 600:
+            engine = "qwen"
+            print("[√] 自动选择引擎: Qwen3-ASR-1.7B (短视频,最准)")
+        elif lang == "zh":
+            engine = "qwen06"
+            print("[√] 自动选择引擎: Qwen3-ASR-0.6B (中文长视频,快档)")
+        else:
+            engine = "funasr"
+            print("[√] 自动选择引擎: Fun-ASR-Nano fp16 (英/日/粤长视频,快档)")
     segs = zh_transcribe(wav, outdir, engine, duration)
     note = {
-        "funasr": "Fun-ASR-Nano-2512 (中英日, 标点+热词)",
+        "funasr": "Fun-ASR-Nano-2512 (英日粤, 标点+热词)",
         "sensevoice": "SenseVoice (极速, 无标点)",
-        "qwen": "Qwen3-ASR-1.7B (中文/多语, 最准)",
+        "qwen": "Qwen3-ASR-1.7B (最准, 52语言)",
         "qwen06": "Qwen3-ASR-0.6B (中文长视频, 快档)",
     }.get(engine, "中文引擎")
     return segs, note
@@ -327,11 +330,11 @@ def ask_engine(engine, duration):
         return "auto"
     dur_min = duration / 60 if duration else 0
     print(f"\n请选择转写引擎（视频时长约 {dur_min:.0f} 分钟）:")
-    print("  1) auto（推荐，直接回车）— 中文<10分钟用 Qwen3-ASR-1.7B（最准），≥10分钟用 Qwen3-ASR-0.6B（快档）")
-    print("  2) Qwen3-ASR-1.7B — 中文最准，多语言52种；较慢")
+    print("  1) auto（推荐，直接回车）— <10分钟一律用 Qwen3-ASR-1.7B（最准）；≥10分钟 中文→0.6B，英日粤→Fun-ASR-Nano")
+    print("  2) Qwen3-ASR-1.7B — 最准，多语言52种；较慢")
     print("  3) Qwen3-ASR-0.6B — 中文长视频快档（比1.7B快约2倍）")
     print("  4) SenseVoice — 极速无标点；仅对比用")
-    print("  5) Fun-ASR-Nano — 英文/日文/粤语引擎（英文已默认用它）")
+    print("  5) Fun-ASR-Nano — 英日粤长视频快档（标点+热词）")
     while True:
         try:
             c = input("输入数字或直接回车(默认1 auto): ").strip().lower()
