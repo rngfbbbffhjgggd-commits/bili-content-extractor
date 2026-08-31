@@ -304,6 +304,19 @@ def detect_lang(title, desc, manual):
 LANG_NAMES = {"zh": "中文", "ja": "日语", "ko": "韩语", "yue": "粤语", "en": "英文"}
 
 
+def _warn_cookie_age():
+    """按 cookie.txt 写入时间提醒续期（B站约 1 个月过期，cookie 值本身无法解析到期日）"""
+    import time as _time
+
+    try:
+        age_days = (_time.time() - os.path.getmtime(COOKIE_FILE)) / 86400.0
+        if age_days > 25:
+            print(f"[!] cookie.txt 已使用 {age_days:.0f} 天，可能即将过期（B站约 1 个月有效）")
+            print("    请打开 bilibili.com 登录后，重新复制 Cookie 覆盖 cookie.txt")
+    except OSError:
+        pass
+
+
 def decide_lang(title, desc, wav, lang_manual):
     """语言决策：SenseVoice 内容检测优先（比标题可靠），标题检测为 fallback"""
     if lang_manual:
@@ -494,10 +507,14 @@ def run(url, use_api=False, lang_manual=None, engine="auto"):
         print(f"[x] 缺少 cookie 文件 {COOKIE_FILE}")
         return
     cookie = open(COOKIE_FILE, encoding="utf-8").read().strip()
+    _warn_cookie_age()
 
     view = bt.get("https://api.bilibili.com/x/web-interface/view", {"bvid": bv}, cookie)
     if view["code"] != 0:
-        print(f"[x] view API 失败: {view.get('message')}")
+        msg = str(view.get("message", ""))
+        print(f"[x] view API 失败: {msg}")
+        if "登录" in msg or "风控" in msg or "-101" in msg:
+            print("[!] 可能是 cookie 过期：打开 bilibili.com 登录后重新复制 Cookie 到 cookie.txt")
         return
     data = view["data"]
     title, owner, duration = data["title"], data["owner"]["name"], data["duration"]
