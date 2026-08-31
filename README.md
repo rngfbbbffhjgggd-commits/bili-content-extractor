@@ -12,10 +12,10 @@ B站 / YouTube 视频链接
    ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
    └─ 无字幕 ──→ SenseVoice 内容语言检测，本地转写
-                  ├─ 中文<10分钟 → Qwen3-ASR-1.7B（最准）
-                  ├─ 中文≥10分钟 → Qwen3-ASR-0.6B（快档）
-                  ├─ 英/日/粤   → Fun-ASR-Nano fp16（标点+热词）
-                  └─ 手动       → SenseVoice（极速无标点）
+                  ├─ <10分钟（任意语言） → Qwen3-ASR-1.7B（最准）
+                  ├─ ≥10分钟 中文      → Qwen3-ASR-0.6B（快档）
+                  ├─ ≥10分钟 英/日/粤  → Fun-ASR-Nano fp16（快档）
+                  └─ 手动             → SenseVoice（极速无标点）
                         │
                         ▼
           生成「投喂文件.md」（视频信息 + 指令 + 带时间戳全文）
@@ -28,8 +28,8 @@ B站 / YouTube 视频链接
 
 - **多平台**：支持 **B站**（AI 字幕优先）和 **YouTube**（Transcript API 免费字幕，无字幕自动转写）
 - **字幕优先**：有字幕的视频直接下载，零成本零延迟
-- **中文双档**：<10 分钟用 Qwen3-ASR-1.7B（最准，52 语言）；≥10 分钟用 Qwen3-ASR-0.6B（快档，比 1.7B 快约 2 倍）
-- **英文引擎 Fun-ASR-Nano-2512**：本地 CPU 英文最优解（带标点+热词），覆盖英/日/粤与中英混说
+- **统一双档**：<10 分钟（任意语言）用 Qwen3-ASR-1.7B（最准，52 语言）；≥10 分钟 中文用 Qwen3-ASR-0.6B、英/日/粤用 Fun-ASR-Nano（均快约 2 倍，自带标点）
+- **英文引擎 Fun-ASR-Nano-2512**：英/日/粤长视频快档（标点+热词+中英混说），准确率 1.7B 更高所以短视频仍归 1.7B
 - **全链路标点**：所有转写引擎输出完整标点（SenseVoice 仅用于语言检测）——投喂 DeepSeek 总结质量更高
 - **免费总结**：产出带指令的投喂文件，配合 DeepSeek **网页版**免费总结，不消耗 API token
 - **全程本地**：音频转写完全本地运行，不上传
@@ -57,7 +57,7 @@ pip install -r requirements.txt
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
-> 中文 <10 分钟自动用它（最准，52 语言）。
+> <10 分钟（任意语言）自动用它（最准，52 语言）。
 
 ### 中文（长视频快档）：Qwen3-ASR-0.6B（int4 ONNX，约 2GB）
 
@@ -68,7 +68,7 @@ python download_qwen06b.py
 落到 `D:\BiliModels\qwen3-asr-0.6b\qwen3-asr-0.6b-int4\`。
 > 中文 ≥10 分钟自动用它（同引擎体系，比 1.7B 快约 2 倍）。
 
-### 英文/日文/粤语：Fun-ASR-Nano-2512（fp16 ONNX，约 2GB）
+### 英文/日文/粤语（长视频快档）：Fun-ASR-Nano-2512（fp16 ONNX，约 2GB）
 
 一键下载（hf-mirror 国内镜像 + 分片并行，断点续传）：
 ```bash
@@ -76,7 +76,7 @@ python download_funasr_nano.py
 ```
 模型落到 `D:\BiliModels\funasr-nano\`（官方 sherpa-onnx 导出，中/英/日 + 7 方言 + 26 口音，自带标点/ITN）。
 > ⚠️ 必须用 **fp16** 版 llm——int8 版有复读退化 bug（[sherpa-onnx issue #3062](https://github.com/k2-fsa/sherpa-onnx/issues/3062)）。
-> 英文默认用它：本地 CPU 英文最优解（官方 LibriSpeech-clean WER 1.76，优于 Qwen3-ASR-0.6B 2.11 / GLM-ASR-nano 2.00），支持中英混说。
+> 英/日/粤 ≥10 分钟自动用它（标点+热词+中英混说；准确率 1.7B 更高，短视频归 1.7B）。
 
 ### 语言检测：SenseVoice（int8 ONNX，239MB）
 

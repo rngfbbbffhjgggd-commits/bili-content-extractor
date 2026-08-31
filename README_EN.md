@@ -12,10 +12,10 @@ Bilibili / YouTube video URL
    ├─ Has subtitles ──→ Download subtitles directly (Bilibili AI subs / YouTube Transcript API)
    │
    └─ No subtitles ──→ SenseVoice content language detection + local transcription
-                       ├─ zh <10min → Qwen3-ASR-1.7B (most accurate)
-                       ├─ zh ≥10min → Qwen3-ASR-0.6B (faster tier)
-                       ├─ en/ja/yue → Fun-ASR-Nano fp16 (punctuation+hotwords)
-                       └─ manual     → SenseVoice (ultra-fast, no punctuation)
+                       ├─ <10min (any language) → Qwen3-ASR-1.7B (most accurate)
+                       ├─ ≥10min zh           → Qwen3-ASR-0.6B (faster tier)
+                       ├─ ≥10min en/ja/yue    → Fun-ASR-Nano fp16 (faster tier)
+                       └─ manual               → SenseVoice (ultra-fast, no punctuation)
                              │
                              ▼
                 Generates a "prompt file.md" (instructions + timestamped transcript)
@@ -28,8 +28,8 @@ Bilibili / YouTube video URL
 
 - **Multi-platform**: **Bilibili** (AI subtitles first) + **YouTube** (free Transcript API subtitles, auto-transcribe when missing)
 - **Subtitles first**: videos with subtitles are downloaded directly — zero cost, zero delay
-- **Chinese dual-tier**: <10min uses Qwen3-ASR-1.7B (most accurate, 52 languages); ≥10min uses Qwen3-ASR-0.6B (faster tier, ~2× faster than 1.7B)
-- **English engine Fun-ASR-Nano-2512**: the best local-CPU English solution (punctuation + hotwords), covers en/ja/yue and zh-en code-switching
+- **Unified dual-tier**: <10min (any language) uses Qwen3-ASR-1.7B (most accurate, 52 languages); ≥10min uses Qwen3-ASR-0.6B for Chinese and Fun-ASR-Nano for en/ja/yue (~2× faster, punctuation included)
+- **English engine Fun-ASR-Nano-2512**: fast tier for long en/ja/yue videos (punctuation + hotwords + code-switching); short videos stay on 1.7B since its accuracy is higher
 - **Full punctuation**: every transcription engine outputs properly punctuated sentences (SenseVoice is used for language detection only) — better transcripts for LLM summarization
 - **Free summaries**: generates a self-contained prompt file for **DeepSeek web** — get a detailed timeline summary for free, no API token consumed
 - **100% local**: transcription runs entirely on your machine, nothing uploaded
@@ -57,7 +57,7 @@ Download `qwen3-asr-1.7b-int4.tar.gz` from [andrewleech/qwen3-asr-1.7b-onnx](htt
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
-> Used automatically for Chinese videos <10 min (most accurate, 52 languages).
+> Used automatically for videos <10 min (any language, most accurate, 52 languages).
 
 ### Chinese (long-video faster tier): Qwen3-ASR-0.6B (int4 ONNX, ~2GB)
 
@@ -68,7 +68,7 @@ python download_qwen06b.py
 Lands in `D:\BiliModels\qwen3-asr-0.6b\qwen3-asr-0.6b-int4\`.
 > Used automatically for Chinese videos ≥10 min (~2× faster than 1.7B, same engine).
 
-### English/Japanese/Cantonese: Fun-ASR-Nano-2512 (fp16 ONNX, ~2GB)
+### English/Japanese/Cantonese (long-video fast tier): Fun-ASR-Nano-2512 (fp16 ONNX, ~2GB)
 
 One-command download (hf-mirror mirror + parallel chunks, resumable):
 ```bash
@@ -76,7 +76,7 @@ python download_funasr_nano.py
 ```
 Lands in `D:\BiliModels\funasr-nano\` (official sherpa-onnx export; zh/en/ja + 7 Chinese dialects + 26 accents, built-in punctuation/ITN).
 > ⚠️ Must use the **fp16** LLM weights — the int8 export has a repetition-loop bug (sherpa-onnx issue [#3062](https://github.com/k2-fsa/sherpa-onnx/issues/3062)).
-> Default for English: best local-CPU English option (LibriSpeech-clean WER 1.76, beats Qwen3-ASR-0.6B 2.11 / GLM-ASR-nano 2.00), handles zh-en code-switching.
+> Used automatically for en/ja/yue videos ≥10 min (punctuation + hotwords + code-switching; 1.7B is more accurate so short videos stay on 1.7B).
 
 ### Language detection: SenseVoice (int8 ONNX, 239MB)
 
