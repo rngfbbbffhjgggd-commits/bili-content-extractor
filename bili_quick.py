@@ -194,8 +194,10 @@ def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
 
 # ---------- 中文转写：Qwen3-ASR ----------
 
-def qwen_transcribe(audio_path, outdir, chunk_sec=60, model_dir=None):
-    """Qwen3-ASR 分段转写 -> [(start_sec, text)]；model_dir 可切换 1.7B/0.6B"""
+def qwen_transcribe(audio_path, outdir, chunk_sec=30, model_dir=None):
+    """Qwen3-ASR 分段转写 -> [(start_sec, text)]；model_dir 可切换 1.7B/0.6B
+
+    chunk_sec=30 实测最快（60s 块 RTF≈0.48 -> 30s 块 RTF≈0.35，短上下文解码更便宜）。"""
     import numpy as np
     import wave
 
