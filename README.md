@@ -11,10 +11,11 @@ B站 / YouTube 视频链接
    │
    ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
-   └─ 无字幕 ──→ 自动检测语言，本地转写
-                  ├─ 中/英/日 → Fun-ASR-Nano-2512（主力：快+准+标点，7方言26口音）
-                  ├─ 韩语等   → Qwen3-ASR-1.7B 兜底（52 语言）
-                  └─ 手动     → SenseVoice（极速无标点）/ Parakeet（英文词级时间戳）
+   └─ 无字幕 ──→ SenseVoice 内容语言检测，本地转写
+                  ├─ 中文<10分钟 → Qwen3-ASR-1.7B（最准）
+                  ├─ 中文≥10分钟 → Qwen3-ASR-0.6B（快档）
+                  ├─ 英/日/粤   → Fun-ASR-Nano fp16（标点+热词）
+                  └─ 手动       → SenseVoice（极速无标点）
                         │
                         ▼
           生成「投喂文件.md」（视频信息 + 指令 + 带时间戳全文）
@@ -27,16 +28,16 @@ B站 / YouTube 视频链接
 
 - **多平台**：支持 **B站**（AI 字幕优先）和 **YouTube**（Transcript API 免费字幕，无字幕自动转写）
 - **字幕优先**：有字幕的视频直接下载，零成本零延迟
-- **主力引擎 Fun-ASR-Nano-2512**：通义 2025-12 新一代模型（0.8B，sherpa-onnx fp16），中英日 + 7 大方言 + 26 种口音，自带标点/ITN/热词；10 分钟视频约 4-6 分钟转完（质量优先，标点完整）
-- **韩语等兜底**：内容语言检测到韩语/其他语言自动切换 Qwen3-ASR（52 语言）
-- **英文词级时间戳**（手动）：Parakeet 每个词带时间戳+置信度，噪声鲁棒性超 Whisper
+- **中文双档**：<10 分钟用 Qwen3-ASR-1.7B（最准，52 语言）；≥10 分钟用 Qwen3-ASR-0.6B（快档，比 1.7B 快约 2 倍）
+- **英文引擎 Fun-ASR-Nano-2512**：本地 CPU 英文最优解（带标点+热词），覆盖英/日/粤与中英混说
+- **全链路标点**：所有转写引擎输出完整标点（SenseVoice 仅用于语言检测）——投喂 DeepSeek 总结质量更高
 - **免费总结**：产出带指令的投喂文件，配合 DeepSeek **网页版**免费总结，不消耗 API token
 - **全程本地**：音频转写完全本地运行，不上传
-- **硬盘友好**：模型约 6GB，可放任意盘（默认 `D:\BiliModels`，环境变量可改）
+- **硬盘友好**：模型约 8GB，可放任意盘（默认 `D:\BiliModels`，环境变量可改）
 
 ## 📦 环境要求
 
-- Windows / Linux / macOS（parakeet.cpp 需对应平台二进制）
+- Windows / Linux / macOS（sherpa-onnx / onnxruntime 跨平台）
 - Python 3.10+
 - [ffmpeg](https://ffmpeg.org/)（转码音频）
 
@@ -48,43 +49,42 @@ cd bili-content-extractor
 pip install -r requirements.txt
 ```
 
-## 🤖 模型下载（约 6GB，放 `D:\BiliModels` 或自定义目录）
+## 🤖 模型下载（约 8GB，放 `D:\BiliModels` 或自定义目录）
 
-### 主力（推荐）：Fun-ASR-Nano-2512（fp16 ONNX，约 2GB）
-
-一键下载（走 hf-mirror 国内镜像 + 分片并行，断点续传）：
-```bash
-python download_funasr_nano.py
-```
-模型落到 `D:\BiliModels\funasr-nano\`（官方 sherpa-onnx 导出，中/英/日 + 7 方言 + 26 口音，自带标点/ITN）。
-> ⚠️ 必须用 **fp16** 版 llm——int8 版有复读退化 bug（[sherpa-onnx issue #3062](https://github.com/k2-fsa/sherpa-onnx/issues/3062)）。
-
-### 中文（可选，极速）：SenseVoice（int8 ONNX，239MB）
-
-从 [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) 下载 `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2`，解压到：
-```
-D:\BiliModels\sensevoice\
-```
-> ⚡ SenseVoice：RTF<0.1，10 分钟中文视频约 50 秒转完；输出无标点。
-
-### 中文（可选，兜底）：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
+### 中文（默认，最准）：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
 
 从 [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) 下载 `qwen3-asr-1.7b-int4.tar.gz`，解压到：
 ```
 D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
 ```
-> 自动规则中韩语/其他语言（52 种）兜底走它；也可 `--engine=qwen` 强制。
+> 中文 <10 分钟自动用它（最准，52 语言）。
 
-### 英文：Parakeet-TDT-0.6B（675MB）
+### 中文（长视频快档）：Qwen3-ASR-0.6B（int4 ONNX，约 2GB）
 
-1. 下载 [parakeet.cpp](https://github.com/mudler/parakeet.cpp/releases) 的 Windows CPU 版 `parakeet-v0.5.0-bin-win-cpu-x64.zip`，解压到：
+一键下载（hf-mirror 国内镜像 + 分片并行，断点续传）：
+```bash
+python download_qwen06b.py
 ```
-D:\BiliModels\parakeet\parakeet-v0.5.0-bin-win-cpu-x64\
+落到 `D:\BiliModels\qwen3-asr-0.6b\qwen3-asr-0.6b-int4\`。
+> 中文 ≥10 分钟自动用它（同引擎体系，比 1.7B 快约 2 倍）。
+
+### 英文/日文/粤语：Fun-ASR-Nano-2512（fp16 ONNX，约 2GB）
+
+一键下载（hf-mirror 国内镜像 + 分片并行，断点续传）：
+```bash
+python download_funasr_nano.py
 ```
-2. 从 [mudler/parakeet-cpp-gguf](https://huggingface.co/mudler/parakeet-cpp-gguf) 下载 `tdt-0.6b-v3-q4_k.gguf` 到：
+模型落到 `D:\BiliModels\funasr-nano\`（官方 sherpa-onnx 导出，中/英/日 + 7 方言 + 26 口音，自带标点/ITN）。
+> ⚠️ 必须用 **fp16** 版 llm——int8 版有复读退化 bug（[sherpa-onnx issue #3062](https://github.com/k2-fsa/sherpa-onnx/issues/3062)）。
+> 英文默认用它：本地 CPU 英文最优解（官方 LibriSpeech-clean WER 1.76，优于 Qwen3-ASR-0.6B 2.11 / GLM-ASR-nano 2.00），支持中英混说。
+
+### 语言检测：SenseVoice（int8 ONNX，239MB）
+
+从 [k2-fsa/sherpa-onnx releases](https://github.com/k2-fsa/sherpa-onnx/releases/tag/asr-models) 下载 `sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2`，解压到：
 ```
-D:\BiliModels\parakeet\
+D:\BiliModels\sensevoice\
 ```
+> 仅用于 40 秒内容语言检测（`result.lang`），不再参与转写。
 
 > 💡 网络不稳时可用仓库自带的 `parallel_download.py` 分片并行下载（快 300 倍）：
 > ```bash
@@ -112,10 +112,10 @@ python bili_quick.py "https://www.bilibili.com/video/BVxxxx"          # B站
 python bili_quick.py "https://www.youtube.com/watch?v=xxxx"           # YouTube
 python bili_quick.py <链接> --lang=zh                                 # 强制中文
 python bili_quick.py <链接> --lang=en                                 # 强制英文
-python bili_quick.py <链接> --engine=funasr                          # 主力：Fun-ASR-Nano（默认）
-python bili_quick.py <链接> --engine=qwen                            # Qwen3-ASR（52语言兜底）
+python bili_quick.py <链接> --engine=qwen                            # 中文强制 Qwen3-1.7B（最准）
+python bili_quick.py <链接> --engine=qwen06                          # 中文强制 Qwen3-0.6B（长视频快档）
+python bili_quick.py <链接> --engine=funasr                          # 强制 Fun-ASR-Nano（英/日/粤）
 python bili_quick.py <链接> --engine=sensevoice                      # SenseVoice（极速，无标点）
-python bili_quick.py <链接> --engine=parakeet                        # Parakeet（仅英文，词级时间戳）
 python bili_quick.py <链接> --api                                     # 可选：用 DeepSeek API 自动总结（消耗 token）
 ```
 
@@ -129,10 +129,9 @@ python bili_quick.py <链接> --api                                     # 可选
 | 变量 | 默认值 | 说明 |
 |---|---|---|
 | `BILI_MODELS_ROOT` | `D:\BiliModels` | 模型根目录 |
+| `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR-1.7B 模型目录 |
+| `QWEN06_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-0.6b\...` | Qwen3-ASR-0.6B 模型目录 |
 | `FUNASR_DIR` | `<MODELS_ROOT>\funasr-nano` | Fun-ASR-Nano 模型目录 |
-| `QWEN_ASR_DIR` | `<MODELS_ROOT>\qwen3-asr-1.7b\...` | Qwen3-ASR 模型目录 |
-| `PARAKET_EXE` | `<MODELS_ROOT>\parakeet\...\parakeet-cli.exe` | parakeet 可执行文件 |
-| `PARAKET_GGUF` | `<MODELS_ROOT>\parakeet\tdt-0.6b-v3-q4_k.gguf` | parakeet 模型 |
 | `BILI_COOKIE_FILE` | `./cookie.txt` | cookie 文件路径 |
 | `BILI_DEEPSEEK_KEY_FILE` | `./deepseek_key.txt` | DeepSeek key 文件路径（仅 `--api` 用） |
 
