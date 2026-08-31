@@ -304,19 +304,6 @@ def detect_lang(title, desc, manual):
 LANG_NAMES = {"zh": "中文", "ja": "日语", "ko": "韩语", "yue": "粤语", "en": "英文"}
 
 
-def _warn_cookie_age():
-    """按 cookie.txt 写入时间提醒续期（B站约 1 个月过期，cookie 值本身无法解析到期日）"""
-    import time as _time
-
-    try:
-        age_days = (_time.time() - os.path.getmtime(COOKIE_FILE)) / 86400.0
-        if age_days > 25:
-            print(f"[!] cookie.txt 已使用 {age_days:.0f} 天，可能即将过期（B站约 1 个月有效）")
-            print("    请打开 bilibili.com 登录后，重新复制 Cookie 覆盖 cookie.txt")
-    except OSError:
-        pass
-
-
 def decide_lang(title, desc, wav, lang_manual):
     """语言决策：SenseVoice 内容检测优先（比标题可靠），标题检测为 fallback"""
     if lang_manual:
@@ -507,7 +494,6 @@ def run(url, use_api=False, lang_manual=None, engine="auto"):
         print(f"[x] 缺少 cookie 文件 {COOKIE_FILE}")
         return
     cookie = open(COOKIE_FILE, encoding="utf-8").read().strip()
-    _warn_cookie_age()
 
     view = bt.get("https://api.bilibili.com/x/web-interface/view", {"bvid": bv}, cookie)
     if view["code"] != 0:
@@ -546,6 +532,15 @@ def run(url, use_api=False, lang_manual=None, engine="auto"):
         break
 
     if segments is None:
+        # 区分「真没字幕」与「cookie 过期」：字幕接口非 0 返回码即过期/风控
+        try:
+            probe = bt.get("https://api.bilibili.com/x/player/wbi/v2",
+                           bt.sign({"bvid": bv, "cid": data["pages"][0]["cid"]}, cookie), cookie)
+            if probe.get("code") != 0:
+                print(f"[!] 字幕接口返回 code={probe.get('code')}（{probe.get('message', '')}）—— 很可能是 cookie 过期：")
+                print("    请打开 bilibili.com 登录后重新复制 Cookie 覆盖 cookie.txt，再试一次")
+        except Exception:
+            pass
         print("\n[!] 无AI字幕，走音频转写兜底 ...")
         audio = os.path.join(outdir, "audio.m4s")
         try:
