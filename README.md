@@ -85,7 +85,6 @@ D:\BiliModels\parakeet\parakeet-v0.5.0-bin-win-cpu-x64\
 ```
 D:\BiliModels\parakeet\
 ```
-> 仅手动选项：词级时间戳 / 逐字保真（英文，无标点）。
 
 > 💡 网络不稳时可用仓库自带的 `parallel_download.py` 分片并行下载（快 300 倍）：
 > ```bash

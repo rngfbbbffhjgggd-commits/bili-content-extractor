@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""download_funasr_nano.py — 下载 sherpa-onnx FunASR-Nano 模型（走 hf-mirror + 分片并行）
+"""download_funasr_nano.py — 下载 sherpa-onnx FunASR-Nano int8 模型（走 hf-mirror + 分片并行）
 
 来源: csukuangfj/sherpa-onnx-funasr-nano-int8-2025-12-30
 目标: D:\\BiliModels\\funasr-nano\\
