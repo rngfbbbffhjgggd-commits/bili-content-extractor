@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% if page.title %}{{ page.title }} · {% endif %}{{ site.title }}</title>
+  <meta name="description" content="{{ site.description }}">
+  <link rel="stylesheet" href="{{ site.baseurl }}/assets/css/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="topbar">
+      <a class="brand" href="{{ site.baseurl }}/">📺 Bili Content Extractor</a>
+      <span class="tagline">文档站</span>
+    </header>
+
+    <div class="layout">
+      <nav class="sidebar">
+        <ul>
+          {% for item in site.nav %}
+            {% for label, href in item %}
+              <li><a href="{{ site.baseurl }}{{ href }}" {% if page.url == href %}class="active"{% endif %}>{{ label }}</a></li>
+            {% endfor %}
+          {% endfor %}
+        </ul>
+        <div class="sidebar-note">
+          <p>📄 项目首页</p>
+          <a href="https://github.com/rngfbbbffhjgggd-commits/bili-content-extractor" target="_blank">GitHub 仓库 ↗</a>
+        </div>
+      </nav>
+
+      <main class="content">
+        {{ content }}
+      </main>
+    </div>
+
+    <footer class="footer">
+      <p>Bili Content Extractor · MIT License · 项目文档站</p>
+    </footer>
+  </div>
+</body>
+</html>

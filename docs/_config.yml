@@ -1,0 +1,17 @@
+title: Bili Content Extractor 文档
+description: 把 B站 / YouTube 视频变成可读文本 + 可投喂的总结材料，全程本地、免费、不消耗 token。
+baseurl: "/bili-content-extractor"
+url: "https://rngfbbbffhjgggd-commits.github.io"
+
+permalink: pretty
+markdown: kramdown
+highlighter: rouge
+
+# 左侧导航（从上到下）
+nav:
+  - "首页": "/"
+  - "安装": "/install"
+  - "模型下载": "/models"
+  - "使用教程": "/usage"
+  - "常见问题": "/faq"
+  - "视频讲解稿": "/video"
