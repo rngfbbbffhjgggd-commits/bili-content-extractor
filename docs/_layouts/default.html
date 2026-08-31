@@ -18,9 +18,10 @@
       <nav class="sidebar">
         <ul>
           {% for item in site.nav %}
-            {% for label, href in item %}
-              <li><a href="{{ site.baseurl }}{{ href }}" {% if page.url == href %}class="active"{% endif %}>{{ label }}</a></li>
-            {% endfor %}
+            {% assign link = item | first %}
+            {% assign label = link[0] %}
+            {% assign href = link[1] %}
+            <li><a href="{{ site.baseurl }}{{ href }}" {% if page.url == href %}class="active"{% endif %}>{{ label }}</a></li>
           {% endfor %}
         </ul>
         <div class="sidebar-note">
