@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""bili_quick.py — B站视频内容一键提取（主力 Fun-ASR-Nano / 兜底 Qwen3-ASR）
+"""bili_quick.py — B站视频内容一键提取（SenseVoice 语言检测 + 三引擎转写）
 
 用法:
   交互模式:   python bili_quick.py           (双击 bat 即可)
@@ -8,10 +8,12 @@
 
 流程:
   有字幕: 抓AI字幕 -> txt/srt
-  无字幕: 下载音频 -> 内容语言检测 -> Fun-ASR-Nano(中英日,快+准+标点)/Qwen3-ASR(韩语兜底) 转写
+  无字幕: 下载音频 -> SenseVoice 内容语言检测 ->
+          中文<10分钟 → Qwen3-ASR-1.7B（最准）/ 中文≥10分钟 → Qwen3-ASR-0.6B（快档）
+          英/日/粤 → Fun-ASR-Nano fp16（标点+热词）
   产物:    投喂文件.md (视频信息 + 指令 + 带时间戳全文) -> 拖进 DeepSeek 网页版即可总结
 输出目录: tools/BilibiliContent/<BV号>/
-模型目录: D:\\BiliModels\\ (Fun-ASR-Nano int8 + Qwen3-ASR 1.7B int4 + SenseVoice + Parakeet)
+模型目录: D:\\BiliModels\\ (Qwen3-ASR 1.7B + 0.6B + Fun-ASR-Nano fp16 + SenseVoice)
 """
 import json
 import os
@@ -33,9 +35,8 @@ COOKIE_FILE = os.environ.get("BILI_COOKIE_FILE", os.path.join(TOOLS_DIR, "cookie
 # 模型根目录：默认 D:\BiliModels，可用环境变量 BILI_MODELS_ROOT 覆盖
 MODELS_ROOT = os.environ.get("BILI_MODELS_ROOT", r"D:\BiliModels")
 QWEN_DIR = os.environ.get("QWEN_ASR_DIR", os.path.join(MODELS_ROOT, "qwen3-asr-1.7b", "qwen3-asr-1.7b-int4"))
+QWEN06_DIR = os.environ.get("QWEN06_ASR_DIR", os.path.join(MODELS_ROOT, "qwen3-asr-0.6b", "qwen3-asr-0.6b-int4"))
 FUNASR_DIR = os.environ.get("FUNASR_DIR", os.path.join(MODELS_ROOT, "funasr-nano"))
-PARAKET_EXE = os.environ.get("PARAKET_EXE", os.path.join(MODELS_ROOT, "parakeet", "parakeet-v0.5.0-bin-win-cpu-x64", "parakeet-cli.exe"))
-PARAKET_GGUF = os.environ.get("PARAKET_GGUF", os.path.join(MODELS_ROOT, "parakeet", "tdt-0.6b-v3-q4_k.gguf"))
 API_URL = "https://api.deepseek.com/chat/completions"
 UA = bt.UA
 
@@ -157,13 +158,14 @@ def download_audio(bv, cid, outpath):
     return outpath
 
 
-# ---------- 中文转写：SenseVoice（快）/ Qwen3-ASR（准），自动按时长选择 ----------
+# ---------- 中文转写：Qwen3-ASR（1.7B 最准 / 0.6B 长视频快档） ----------
 
 def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
-    """中英日转写：auto → Fun-ASR-Nano（快+准+标点），可强制指定；失败逐级回退"""
+    """中文转写：auto → <10分钟用 Qwen3-1.7B（最准），≥10分钟用 Qwen3-0.6B（快档）
+    可强制指定 funasr / sensevoice / qwen / qwen06"""
     if engine == "auto":
-        engine = "funasr"
-        print("[√] 自动选择引擎: Fun-ASR-Nano (中英日, 快+准+标点)")
+        engine = "qwen06" if duration >= 600 else "qwen"
+        print(f"[√] 自动选择引擎: {'Qwen3-ASR-0.6B (长视频,快档)' if engine == 'qwen06' else 'Qwen3-ASR-1.7B (短视频,最准)'}")
     if engine == "funasr":
         try:
             from funasr_nano_engine import transcribe_audio as fn_transcribe
@@ -171,32 +173,38 @@ def zh_transcribe(audio_path, outdir, engine="auto", duration=0):
             print("[√] 中文转写引擎: Fun-ASR-Nano-2512 (标点+热词)")
             return fn_transcribe(audio_path, outdir)
         except (ImportError, FileNotFoundError) as e:
-            print(f"[!] funasr-nano 不可用 ({e})，回退 SenseVoice")
-            engine = "sensevoice"
+            print(f"[!] funasr-nano 不可用 ({e})，回退 Qwen3-1.7B")
+            engine = "qwen"
     if engine == "sensevoice":
         try:
             from sensevoice_engine import transcribe_audio as sv_transcribe
 
-            print("[√] 中文转写引擎: SenseVoice (RTF<0.1, 快8倍)")
+            print("[√] 中文转写引擎: SenseVoice (RTF<0.1, 快8倍, 无标点)")
             return sv_transcribe(audio_path, outdir)
         except ImportError:
-            print("[!] sensevoice_engine 不可用，回退 Qwen3-ASR")
+            print("[!] sensevoice_engine 不可用，回退 Qwen3-1.7B")
         except FileNotFoundError as e:
-            print(f"[!] {e}，回退 Qwen3-ASR")
+            print(f"[!] {e}，回退 Qwen3-1.7B")
+        engine = "qwen"
+    if engine == "qwen06":
+        print(f"[√] 加载 Qwen3-ASR-0.6B (长视频快档)...")
+        return qwen_transcribe(audio_path, outdir, model_dir=QWEN06_DIR)
     return qwen_transcribe(audio_path, outdir)
 
 
 # ---------- 中文转写：Qwen3-ASR ----------
 
-def qwen_transcribe(audio_path, outdir, chunk_sec=60):
-    """Qwen3-ASR 分段转写 -> [(start_sec, text)]"""
+def qwen_transcribe(audio_path, outdir, chunk_sec=60, model_dir=None):
+    """Qwen3-ASR 分段转写 -> [(start_sec, text)]；model_dir 可切换 1.7B/0.6B"""
     import numpy as np
     import wave
 
     from qwen_asr_engine import QwenASREngine, SAMPLE_RATE
 
-    if not os.path.exists(os.path.join(QWEN_DIR, "encoder.int4.onnx")):
-        print("[!] Qwen3-ASR 模型缺失:", QWEN_DIR)
+    if model_dir is None:
+        model_dir = QWEN_DIR
+    if not os.path.exists(os.path.join(model_dir, "encoder.int4.onnx")):
+        print("[!] Qwen3-ASR 模型缺失:", model_dir)
         return None
 
     # 读音频为 16k mono float32
@@ -215,8 +223,7 @@ def qwen_transcribe(audio_path, outdir, chunk_sec=60):
         audio = np.interp(np.linspace(0, len(audio) - 1, n), np.arange(len(audio)), audio)
     audio = audio.astype(np.float32)
 
-    print(f"[√] 加载 Qwen3-ASR (中文, 22种方言)...")
-    eng = QwenASREngine(QWEN_DIR)
+    eng = QwenASREngine(model_dir)
 
     total = len(audio) / SAMPLE_RATE
     segs = []
@@ -241,61 +248,33 @@ def qwen_transcribe(audio_path, outdir, chunk_sec=60):
     return segs
 
 
-# ---------- 英文转写：Parakeet ----------
-
-def parakeet_transcribe(audio_path):
-    """Parakeet (TDT) 转写 -> [(start_sec, text)]，词级时间戳合并"""
-    if not os.path.exists(PARAKET_EXE) or not os.path.exists(PARAKET_GGUF):
-        print("[!] Parakeet 模型/程序缺失")
-        print("   ", PARAKET_EXE)
-        print("   ", PARAKET_GGUF)
-        return None
-    print("[√] 英文转写引擎: Parakeet-TDT-0.6B")
-    cmd = [PARAKET_EXE, "transcribe", "--model", PARAKET_GGUF,
-           "--input", audio_path, "--lang", "en", "--json"]
-    proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", timeout=7200)
-    if proc.returncode != 0:
-        print("[x] parakeet-cli 失败:", proc.stderr[-300:])
-        return None
-    data = json.loads(proc.stdout)
-    words = data.get("words", [])
-    segs = []
-    cur = []
-    cur_start = None
-    for w in words:
-        if cur_start is None:
-            cur_start = w["start"]
-        cur.append(w["w"])
-        if len(cur) >= 12:
-            segs.append((cur_start, " ".join(cur)))
-            cur, cur_start = [], None
-    if cur:
-        segs.append((cur_start, " ".join(cur)))
-    return segs
-
-
-# ---------- 引擎分发（统一入口） ----------
+# ---------- 引擎分发（统一入口，用户拍板方案） ----------
 
 def transcribe_with_engine(wav, outdir, lang, duration, engine):
-    """引擎分发: 韩语/其他语言 -> Qwen3-ASR 兜底；中英日 -> 菜单选择（auto 默认 Fun-ASR-Nano）
+    """引擎分发:
+       中文      → <10分钟 Qwen3-1.7B（最准），≥10分钟 Qwen3-0.6B（快档）
+       英/日/粤  → Fun-ASR-Nano fp16（英文最优解，标点+热词，支持中英混说）
+       其他语言  → Qwen3-1.7B 兜底（52 语言）
+       Parakeet 已移除（无标点）
     返回 (segments, engine_note)"""
     if engine == "parakeet":
-        return parakeet_transcribe(wav), "Parakeet-TDT-0.6B (英文)"
-    if lang not in ("zh", "en", "ja", "yue", None):
-        return qwen_transcribe(wav, outdir), "Qwen3-ASR-1.7B (韩语/其他语言兜底)"
-    if lang == "en" and engine == "auto":
-        # 纯英文也默认 Fun-ASR-Nano（带标点、支持中英混说）；Parakeet 可 --engine=parakeet 指定
-        engine = "funasr"
+        print("[!] Parakeet 已移除（输出无标点），改用自动方案")
+        engine = "auto"
+    if lang in ("en", "ja", "yue"):
+        # 英/日/粤 → Fun-ASR-Nano（唯一本地英文最优解）
+        segs = zh_transcribe(wav, outdir, "funasr", duration)
+        return segs, "Fun-ASR-Nano-2512 (英/日/粤, 标点+热词)"
+    # 中文 + 其他语言：菜单选择（auto 按时长切 1.7B/0.6B；其他语言兜底 1.7B）
     engine = ask_engine(engine, duration)
     if engine == "auto":
-        engine = "funasr"
-    if engine == "parakeet":
-        return parakeet_transcribe(wav), "Parakeet-TDT-0.6B (英文)"
+        engine = "qwen06" if duration >= 600 else "qwen"
+        print(f"[√] 自动选择引擎: {'Qwen3-ASR-0.6B (长视频,快档)' if engine == 'qwen06' else 'Qwen3-ASR-1.7B (短视频,最准)'}")
     segs = zh_transcribe(wav, outdir, engine, duration)
     note = {
-        "funasr": "Fun-ASR-Nano-2512 (中英日, 快+准+标点)",
-        "sensevoice": "SenseVoice (中文/多语, 快8倍)",
-        "qwen": "Qwen3-ASR-1.7B (中文/多语)",
+        "funasr": "Fun-ASR-Nano-2512 (中英日, 标点+热词)",
+        "sensevoice": "SenseVoice (极速, 无标点)",
+        "qwen": "Qwen3-ASR-1.7B (中文/多语, 最准)",
+        "qwen06": "Qwen3-ASR-0.6B (中文长视频, 快档)",
     }.get(engine, "中文引擎")
     return segs, note
 
@@ -348,11 +327,11 @@ def ask_engine(engine, duration):
         return "auto"
     dur_min = duration / 60 if duration else 0
     print(f"\n请选择转写引擎（视频时长约 {dur_min:.0f} 分钟）:")
-    print("  1) auto（推荐，直接回车）— 中英日→Fun-ASR-Nano（快+准+标点），韩语→Qwen3-ASR")
-    print("  2) Qwen3-ASR — 多语言52种+22方言，覆盖最全；较慢")
-    print("  3) SenseVoice — 快8倍无标点；保留用于对比/语言检测")
-    print("  4) Parakeet — 仅英文，词级时间戳，噪声鲁棒")
-    print("  5) Fun-ASR-Nano — 主力：中英日+7方言+26口音，标点+热词")
+    print("  1) auto（推荐，直接回车）— 中文<10分钟用 Qwen3-1.7B（最准），≥10分钟用 Qwen3-0.6B（快档）")
+    print("  2) Qwen3-ASR-1.7B — 中文最准，多语言52种；较慢")
+    print("  3) Qwen3-ASR-0.6B — 中文长视频快档（比1.7B快约2倍）")
+    print("  4) SenseVoice — 极速无标点；仅对比用")
+    print("  5) Fun-ASR-Nano — 英文/日文/粤语引擎（英文已默认用它）")
     while True:
         try:
             c = input("输入数字或直接回车(默认1 auto): ").strip().lower()
@@ -360,12 +339,12 @@ def ask_engine(engine, duration):
             return "auto"
         if c in ("", "1", "auto"):
             return "auto"
-        if c in ("2", "qwen", "qwen3", "qwen3-asr"):
+        if c in ("2", "qwen", "qwen3", "qwen3-asr", "17b"):
             return "qwen"
-        if c in ("3", "sensevoice", "sv"):
+        if c in ("3", "qwen06", "qwen06b", "0.6b", "06"):
+            return "qwen06"
+        if c in ("4", "sensevoice", "sv"):
             return "sensevoice"
-        if c in ("4", "parakeet", "pk"):
-            return "parakeet"
         if c in ("5", "funasr", "fn", "nano"):
             return "funasr"
         print("无效输入，请输入 1-5 或直接回车")
