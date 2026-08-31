@@ -19,7 +19,6 @@ FILES = [
     "embedding.int8.onnx",
     "encoder_adaptor.int8.onnx",
     "llm.fp16.onnx",   # int8 版有复读退化 bug（issue #3062），必须用 fp16
-    "llm.int8.onnx",   # 保留作为 fp16 缺失时的回退
     "Qwen3-0.6B/tokenizer.json",
     "Qwen3-0.6B/vocab.json",
     "Qwen3-0.6B/merges.txt",

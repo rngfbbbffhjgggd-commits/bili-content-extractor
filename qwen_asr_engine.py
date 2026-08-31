@@ -144,7 +144,8 @@ def log_mel(audio):
 # ---------- 推理 ----------
 
 class QwenASREngine:
-    def __init__(self, model_dir=MODEL_DIR, threads=0):
+    def __init__(self, model_dir=MODEL_DIR, threads=8):
+        # threads=8 实测最优（16 核机器：小算子并行 16 线程反而更慢）
         import onnxruntime as ort
 
         opts = ort.SessionOptions()

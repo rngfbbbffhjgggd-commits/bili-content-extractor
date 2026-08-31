@@ -23,8 +23,6 @@ class FunASRNanoEngine:
 
         # 注意: int8 版 llm 会复读退化/漏译（sherpa-onnx issue #3062），必须用 fp16
         llm = os.path.join(MODEL_DIR, "llm.fp16.onnx")
-        if not os.path.exists(llm):
-            llm = os.path.join(MODEL_DIR, "llm.int8.onnx")
         needed = {
             "encoder_adaptor.int8.onnx": "编码器",
             "embedding.int8.onnx": "Embedding",
