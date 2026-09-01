@@ -22,13 +22,13 @@ layout: default
 
 ## 📥 下载方式
 
-### Qwen3-ASR-1.7B（中文最准，手动下载）
+### Qwen3-ASR-1.7B（中文最准，一键下载）
 
-从 [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) 下载 `qwen3-asr-1.7b-int4.tar.gz`，解压到这个路径：
+```bash
+python download_qwen17b.py
+```
 
-```
-D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
-```
+自动落到 `D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\`（走 hf-mirror 国内镜像 + 分片并行 + 断点续传）。
 
 ### Qwen3-ASR-0.6B（中文长视频快档，一键下载）
 

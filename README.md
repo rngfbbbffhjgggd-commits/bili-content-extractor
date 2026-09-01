@@ -2,6 +2,13 @@
 
 **[English](README_EN.md) · 中文**
 
+[![Release](https://img.shields.io/github/v/release/rngfbbbffhjgggd-commits/bili-content-extractor?color=fb7299&label=Release)](https://github.com/rngfbbbffhjgggd-commits/bili-content-extractor/releases/latest)
+[![License](https://img.shields.io/github/license/rngfbbbffhjgggd-commits/bili-content-extractor?color=blue)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Bilibili](https://img.shields.io/badge/Bilibili-%E5%93%94%E5%93%A9%E5%93%94%E5%93%A9-00a1d6?logo=bilibili&logoColor=white)](https://www.bilibili.com/)
+[![YouTube](https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/)
+[![Languages](https://img.shields.io/badge/52%20Languages-00c8ff)]()
+
 把 **B站 / YouTube** 视频变成**可读文本 + 可投喂的总结材料**，全程本地、免费、不消耗 token。
 
 ![工作流程](docs/flow.svg)
@@ -41,6 +48,23 @@ B站 / YouTube 视频链接
 - Python 3.10+
 - [ffmpeg](https://ffmpeg.org/)（转码音频）
 
+## 🚀 快速开始（约 30 秒上手）
+
+```bash
+# 1. 安装依赖
+pip install -r requirements.txt
+
+# 2. 下载模型（约 8GB，国内镜像 + 断点续传，只需下你需要的档位）
+python download_qwen17b.py    # 短视频档 Qwen3-ASR-1.7B（最准，必下）
+python download_qwen06b.py    # 中文长视频快档 Qwen3-ASR-0.6B（可选）
+python download_funasr_nano.py  # 英/日/粤长视频快档 Fun-ASR-Nano（可选）
+
+# 3. 提取视频内容（有字幕直接下载，无字幕自动本地转写）
+python bili_quick.py "https://www.bilibili.com/video/BVxxxx"
+```
+
+把生成的 `投喂DeepSeek网页版.md` 拖进 [chat.deepseek.com](https://chat.deepseek.com)，免费得到详细时间线总结（不花 token）。
+
 ## 🚀 安装
 
 ```bash
@@ -53,10 +77,11 @@ pip install -r requirements.txt
 
 ### 中文（默认，最准）：Qwen3-ASR-1.7B（int4 ONNX，3.9GB）
 
-从 [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) 下载 `qwen3-asr-1.7b-int4.tar.gz`，解压到：
+一键下载（hf-mirror 国内镜像 + 分片并行，断点续传）：
+```bash
+python download_qwen17b.py
 ```
-D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
-```
+落到 `D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\`（模型来自 [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx)）。
 > <10 分钟（任意语言）自动用它（最准，52 语言）。
 
 ### 中文（长视频快档）：Qwen3-ASR-0.6B（int4 ONNX，约 2GB）

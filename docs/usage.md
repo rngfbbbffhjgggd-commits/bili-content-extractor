@@ -53,7 +53,7 @@ python bili_quick.py "https://www.youtube.com/watch?v=xxxx"
 # 强制中文、用最准的 1.7B
 python bili_quick.py "视频链接" --lang=zh --engine=qwen
 
-# 深泽英语长视频，用快档
+# 英文长视频，用快档
 python bili_quick.py "链接" --lang=en --engine=funasr
 ```
 

@@ -4,6 +4,13 @@ One-click extraction of content from **Bilibili & YouTube** videos: **subtitles 
 
 **[中文文档](README.md)**
 
+[![Release](https://img.shields.io/github/v/release/rngfbbbffhjgggd-commits/bili-content-extractor?color=fb7299&label=Release)](https://github.com/rngfbbbffhjgggd-commits/bili-content-extractor/releases/latest)
+[![License](https://img.shields.io/github/license/rngfbbbffhjgggd-commits/bili-content-extractor?color=blue)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Bilibili](https://img.shields.io/badge/Bilibili-00a1d6?logo=bilibili&logoColor=white)](https://www.bilibili.com/)
+[![YouTube](https://img.shields.io/badge/YouTube-FF0000?logo=youtube&logoColor=white)](https://www.youtube.com/)
+[![Languages](https://img.shields.io/badge/52%20Languages-00c8ff)]()
+
 ![Workflow](docs/flow.svg)
 
 ```
@@ -41,6 +48,23 @@ Bilibili / YouTube video URL
 - Python 3.10+
 - [ffmpeg](https://ffmpeg.org/)
 
+## 🚀 Quick Start (~30 seconds)
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Download models (~8GB, mirror + resumable; only fetch what you need)
+python download_qwen17b.py       # short-video tier Qwen3-ASR-1.7B (most accurate, required)
+python download_qwen06b.py       # Chinese long-video tier Qwen3-ASR-0.6B (optional)
+python download_funasr_nano.py   # en/ja/yue long-video tier Fun-ASR-Nano (optional)
+
+# 3. Extract video content (subtitles downloaded when available, local transcription otherwise)
+python bili_quick.py "https://www.bilibili.com/video/BVxxxx"
+```
+
+Paste the generated `投喂DeepSeek网页版.md` into [chat.deepseek.com](https://chat.deepseek.com) for a free detailed timeline summary (no token usage).
+
 ## 🚀 Install
 
 ```bash
@@ -53,10 +77,11 @@ pip install -r requirements.txt
 
 ### Chinese (default, most accurate): Qwen3-ASR-1.7B (int4 ONNX, 3.9GB)
 
-Download `qwen3-asr-1.7b-int4.tar.gz` from [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx) and extract to:
+One-command download (hf-mirror mirror + parallel chunks, resumable):
+```bash
+python download_qwen17b.py
 ```
-D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\
-```
+Lands in `D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\` (from [andrewleech/qwen3-asr-1.7b-onnx](https://huggingface.co/andrewleech/qwen3-asr-1.7b-onnx)).
 > Used automatically for videos <10 min (any language, most accurate, 52 languages).
 
 ### Chinese (long-video faster tier): Qwen3-ASR-0.6B (int4 ONNX, ~2GB)
