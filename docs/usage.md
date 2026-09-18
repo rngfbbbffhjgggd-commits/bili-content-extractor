@@ -38,11 +38,13 @@ python bili_quick.py "https://www.youtube.com/watch?v=xxxx"
 
 ## 🧰 常用参数
 
+> 💡 **默认引擎**：中文视频（任意时长）一律用 Qwen3-ASR-0.6B（快档）；非中文 <10 分钟用 Qwen3-ASR-1.7B（最准）；英/日/粤 ≥10 分钟用 Fun-ASR-Nano。下面的参数可以强制指定。
+
 | 参数 | 作用 |
 |---|---|
 | `--lang=zh` / `--lang=en` | 强制指定语言 |
-| `--engine=qwen` | 中文强制用 Qwen3-ASR-1.7B（最准） |
-| `--engine=qwen06` | 中文强制用 Qwen3-ASR-0.6B（长视频快档） |
+| `--engine=qwen` | 中文强制用 Qwen3-ASR-1.7B（最准，较慢） |
+| `--engine=qwen06` | 中文强制用 Qwen3-ASR-0.6B（中文默认档） |
 | `--engine=funasr` | 强制用 Fun-ASR-Nano（英/日/粤） |
 | `--engine=sensevoice` | SenseVoice（极速，无标点） |
 | `--api` | 可选：用 DeepSeek API 自动总结（**消耗 token**，想免费就别加） |

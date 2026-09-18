@@ -13,8 +13,8 @@ layout: default
 
 | 模型 | 体积 | 用途 | 适合场景 |
 |---|---|---|---|
-| **Qwen3-ASR-1.7B**（int4） | 3.9GB | 最准，52 语言 | **<10 分钟**（任意语言）自动用它 |
-| **Qwen3-ASR-0.6B**（int4） | 约 2GB | 中文快档 | **中文 ≥10 分钟**自动用它 |
+| **Qwen3-ASR-1.7B**（int4） | 3.9GB | 最准，52 语言 | **非中文 <10 分钟**自动用它 |
+| **Qwen3-ASR-0.6B**（int4） | 约 2GB | 中文默认快档 | **中文（任意时长）**默认用它 |
 | **Fun-ASR-Nano-2512**（fp16） | 约 2GB | 英/日/粤快档 | **英/日/粤 ≥10 分钟**自动用它 |
 | **SenseVoice**（int8） | 239MB | 语言检测 | 用于识别视频是什么语言（不参与转写，但建议装） |
 
@@ -22,7 +22,7 @@ layout: default
 
 ## 📥 下载方式
 
-### Qwen3-ASR-1.7B（中文最准，一键下载）
+### Qwen3-ASR-1.7B（非中文短视频最准，一键下载）
 
 ```bash
 python download_qwen17b.py
@@ -30,7 +30,7 @@ python download_qwen17b.py
 
 自动落到 `D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4\`（走 hf-mirror 国内镜像 + 分片并行 + 断点续传）。
 
-### Qwen3-ASR-0.6B（中文长视频快档，一键下载）
+### Qwen3-ASR-0.6B（中文默认快档，一键下载）
 
 ```bash
 python download_qwen06b.py
