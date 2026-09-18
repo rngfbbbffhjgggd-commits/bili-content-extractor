@@ -16,6 +16,16 @@ sys.stdout.reconfigure(encoding="utf-8")
 
 MODEL_DIR = os.environ.get("QWEN_ASR_DIR", r"D:\BiliModels\qwen3-asr-1.7b\qwen3-asr-1.7b-int4")
 SAMPLE_RATE = 16000
+
+# ---- 复读（repetition loop）防护 ----
+# 现象: 模型在低置信片段上会不输出 EOS、无限重复同一句（如"…作为百年德国制药巨头…"），
+# 贪心解码一路跑满 max_tokens，单块耗时可达数分钟。以下三个参数是防护。
+MAX_NEW_TOKENS = 512   # 单块解码上限（30s 音频 ~300 token 足够）
+REP_PENALTY = 0.0      # 对最近出现过的 token 施加的 logit 惩罚（0 = 关闭，保持贪心结果不变）
+                       # 实测：轻度惩罚(1.0)反而更容易触发复读；3.0~5.0 能压住复读，但会改变正常
+                       # 音频的转写结果（与关闭时相似度约 90~95%）。默认关闭，靠下面的截断兜底。
+REP_WINDOW = 24        # 惩罚回看窗口（token 数）
+REP_CHECK_EVERY = 2    # 每 N 步做一次复读检测（检测本身有开销）
 N_FFT = 400
 HOP_LENGTH = 160
 N_MELS = 128
@@ -111,7 +121,8 @@ def log_mel(audio):
 
         mel_filters = librosa.filters.mel(sr=SAMPLE_RATE, n_fft=N_FFT, n_mels=N_MELS,
                                           fmin=FMIN, fmax=FMAX, norm="slaney")
-    except ImportError:
+    except Exception:
+        # librosa 缺失，或 numpy/numba 版本不兼容（如 Python 3.14 下 numba 缓存报错）
         mel_filters = _hand_mel_filterbank(SAMPLE_RATE, N_FFT, N_MELS, FMIN, FMAX)
 
     # periodic hann window（与 torch.hann_window(periodic) 一致）
@@ -141,6 +152,26 @@ def log_mel(audio):
     return log_spec[np.newaxis].astype(np.float32)  # [1, 128, T]
 
 
+def truncate_repetition(tokens, max_period=50, times=3):
+    """检测结尾是否陷入复读；若是，返回截断到「首次出现」为止的 tokens，否则返回 None。
+
+    例: [... A B C A B C A B C ...] -> 返回 [... A B C]
+    """
+    n = len(tokens)
+    for p in range(1, max_period + 1):
+        if n < p * times:
+            break
+        block = tokens[n - p:]
+        reps = 1
+        i = n - p
+        while i - p >= 0 and tokens[i - p:i] == block:
+            reps += 1
+            i -= p
+        if reps >= times:
+            return tokens[:i + p]
+    return None
+
+
 # ---------- 推理 ----------
 
 class QwenASREngine:
@@ -166,7 +197,7 @@ class QwenASREngine:
         self.tokenizer = Tokenizer.from_file(os.path.join(model_dir, "tokenizer.json"))
         print(f"[√] Qwen3-ASR 引擎就绪 ({model_dir})")
 
-    def transcribe(self, audio_path, max_tokens=2048, start_time=0.0):
+    def transcribe(self, audio_path, max_tokens=MAX_NEW_TOKENS, start_time=0.0):
         import wave
 
         # 优先 soundfile（m4s/mp4 等），fallback wave（wav）
@@ -208,21 +239,34 @@ class QwenASREngine:
              "audio_features": audio_features, "audio_offset": audio_offset},
         )
         tokens = [int(np.argmax(logits[0, -1, :]))]
+        repeat_hit = False
         if tokens[0] not in EOS_IDS:
             pos = len(prompt_ids)
-            for _ in range(max_tokens - 1):
+            for step in range(max_tokens - 1):
                 token_embed = self.embed_tokens[tokens[-1]][np.newaxis, np.newaxis, :]
                 logits, pk, pv = self.decoder_step.run(
                     ["logits", "present_keys", "present_values"],
                     {"input_embeds": token_embed, "position_ids": np.array([[pos]], dtype=np.int64),
                      "past_keys": pk, "past_values": pv},
                 )
-                tok = int(np.argmax(logits[0, -1, :]))
+                row = logits[0, -1, :]
+                if REP_PENALTY > 0 and len(tokens) > 1:
+                    recent = np.unique(np.array(tokens[-REP_WINDOW:], dtype=np.int64))
+                    row = row.copy()
+                    row[recent] -= REP_PENALTY
+                tok = int(np.argmax(row))
                 tokens.append(tok)
                 pos += 1
                 if tok in EOS_IDS:
                     break
-        print(f"  [decode {time.time()-t0:.1f}s, {len(tokens)} tokens]", flush=True)
+                if REP_CHECK_EVERY and step % REP_CHECK_EVERY == 0:
+                    cut = truncate_repetition(tokens)
+                    if cut is not None:
+                        tokens = cut
+                        repeat_hit = True
+                        break
+        note = "，复读截断" if repeat_hit else ""
+        print(f"  [decode {time.time()-t0:.1f}s, {len(tokens)} tokens{note}]", flush=True)
 
         # 去掉 prompt 部分（我们只解码生成 tokens），解码文本
         text = self.tokenizer.decode(tokens, skip_special_tokens=True).strip()

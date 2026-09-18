@@ -256,8 +256,7 @@ def transcribe_with_engine(wav, outdir, lang, duration, engine):
     """引擎分发（统一双档方案）:
        <10分钟（任意语言） → Qwen3-ASR-1.7B（最准，52语言）
        ≥10分钟: 中文 → Qwen3-ASR-0.6B（中文快档）
-                英/日/粤 → Fun-ASR-Nano fp16（快档，标点+热词）
-       其他语言 → Qwen3-ASR-1.7B 兜底
+                其他语言 → Fun-ASR-Nano fp16（快档，标点+热词；英/日/粤为主）
        Parakeet 已移除（无标点）
     返回 (segments, engine_note)"""
     if engine == "parakeet":

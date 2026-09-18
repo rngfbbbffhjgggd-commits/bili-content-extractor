@@ -27,9 +27,9 @@ B站 / YouTube 视频链接
    ├─ 有字幕 ──→ 直接下载字幕（B站 AI字幕 / YouTube Transcript API）
    │
    └─ 无字幕 ──→ 本地转写
-                  ├─ 中文（任意时长）  → Qwen3-ASR-0.6B（中文默认，快档）
-                  ├─ 非中文 <10分钟    → Qwen3-ASR-1.7B（最准）
-                  ├─ 英/日/粤 ≥10分钟  → Fun-ASR-Nano fp16（快档）
+                  ├─ <10分钟（任意语言） → Qwen3-ASR-1.7B（最准）
+                  ├─ ≥10分钟 中文      → Qwen3-ASR-0.6B（快档）
+                  ├─ ≥10分钟 英/日/粤  → Fun-ASR-Nano fp16（快档）
                   └─ 手动             → SenseVoice（极速无标点）
                         │
                         ▼
