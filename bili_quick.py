@@ -22,6 +22,7 @@ import subprocess
 import sys
 import webbrowser
 import urllib.request
+from urllib.parse import urlparse
 
 sys.stdout.reconfigure(encoding="utf-8")
 
@@ -476,10 +477,22 @@ def run_youtube(url, use_api=False, lang_manual=None, engine="auto"):
 
 # ---------- 平台分发 ----------
 
+def _url_host(url):
+    """取 URL 的主机名：没有协议头的裸输入按 https 补全再解析，解析失败返回空串。"""
+    raw = url if "://" in url else "https://" + url
+    try:
+        return (urlparse(raw).hostname or "").lower()
+    except ValueError:
+        return ""
+
+
 def run_any(url, use_api=False, lang_manual=None, engine="auto"):
-    if "bilibili.com" in url or "b23.tv" in url or re.search(r"BV[0-9A-Za-z]{10}", url):
+    host = _url_host(url)
+    is_bili = host == "bilibili.com" or host.endswith(".bilibili.com") or host == "b23.tv" or host.endswith(".b23.tv")
+    is_yt = host == "youtube.com" or host.endswith(".youtube.com") or host == "youtu.be"
+    if is_bili or re.search(r"BV[0-9A-Za-z]{10}", url):
         run(url, use_api, lang_manual, engine)
-    elif "youtube.com" in url or "youtu.be" in url:
+    elif is_yt:
         run_youtube(url, use_api, lang_manual, engine)
     else:
         print("[x] 不支持的平台（目前支持: B站 / YouTube）")
